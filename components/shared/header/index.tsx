@@ -1,0 +1,28 @@
+import Image from "next/image";
+import Link from "next/link";
+import { APP_NAME } from "@/lib/constants";
+import ModeToggle from "./mode-toggle";
+
+const Hearder = () => {
+  return (
+    <header className="w-full border-b">
+      <div className="wrapper flex items-center justify-between">
+        <Link href="/" className="flex items-center justify-center">
+          <Image
+            src="/images/icon_64x.png"
+            alt={`${APP_NAME} logo`}
+            height={48}
+            width={48}
+            priority={true}
+          />
+          <span className="hidden sm:block font-bold text-2xl ml-3">
+            {APP_NAME}
+          </span>
+        </Link>
+        <ModeToggle />
+      </div>
+    </header>
+  );
+};
+
+export default Hearder;

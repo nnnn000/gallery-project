@@ -25,21 +25,17 @@ const TAG_CATEGORIES = [
 
 const MOCK_TAGS_LIST = TAG_CATEGORIES.map((t) => t.tag);
 
-// ฟังก์ชันสุ่ม Tag (ปรับปรุงให้บังคับใส่ได้หลาย Tag)
 const getRandomTags = (forceTags: string[] = []) => {
-  // เอา Tag ที่ไม่ได้ถูก force มาสุ่ม
   const shuffled = [...MOCK_TAGS_LIST]
     .filter((t) => !forceTags.includes(t))
     .sort(() => 0.5 - Math.random());
 
-  // สุ่ม Tag เพิ่มเติมอีก 1-3 ตัว เพื่อให้รูปดูมีมิติ
   const extraCount = Math.floor(Math.random() * 3) + 1;
   const selected = [...forceTags, ...shuffled.slice(0, extraCount)];
 
   return selected;
 };
 
-// --- Skeleton Component ---
 const Skeleton = ({ height }: { height: number }) => (
   <div
     className="w-full bg-gray-200 dark:bg-zinc-800 animate-pulse rounded-xl"
@@ -59,7 +55,11 @@ const ImageCard = ({
   const [randomHeight] = useState(Math.floor(Math.random() * 200 + 250));
 
   return (
-    <div className="group mb-4 relative overflow-hidden rounded-xl shadow-sm bg-gray-200 dark:bg-zinc-800">
+    <div
+      // กดที่รูปตรงไหนก็ได้เพื่อเปิด Modal
+      className="group mb-4 relative overflow-hidden rounded-xl shadow-sm bg-gray-200 dark:bg-zinc-800 cursor-pointer"
+      onClick={() => onOpenModal(image)}
+    >
       {!isLoaded && <Skeleton height={randomHeight} />}
       <img
         src={image.url}
@@ -70,12 +70,15 @@ const ImageCard = ({
         onLoad={() => setIsLoaded(true)}
       />
 
+      {/* ซ่อนปุ่ม # บนมือถือ (ใช้ hidden md:flex) 
+        จะแสดงเฉพาะตอน Hover บนจอใหญ่เท่านั้น (md:opacity-0 md:group-hover:opacity-100) 
+      */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onOpenModal(image);
         }}
-        className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 dark:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 text-gray-800 dark:text-gray-200 shadow-lg font-bold text-lg cursor-pointer z-10"
+        className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 dark:bg-black/80 backdrop-blur-sm rounded-full hidden md:flex items-center justify-center transition-all duration-300 hover:scale-110 text-gray-800 dark:text-gray-200 shadow-lg font-bold text-lg z-10 opacity-0 group-hover:opacity-100"
       >
         #
       </button>
@@ -151,7 +154,6 @@ export default function InteractiveGallery() {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
 
-  // เปลี่ยนมาเก็บเป็น Array สำหรับรับหลาย Tag
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   const navScrollRef = useRef<HTMLDivElement>(null);
@@ -174,7 +176,7 @@ export default function InteractiveGallery() {
         url: `https://picsum.photos/seed/${Math.random()}/500/${Math.floor(
           Math.random() * 300 + 400,
         )}`,
-        tags: getRandomTags(filterTags), // ส่ง Array ของ tag ที่เลือกไปบังคับสุ่ม
+        tags: getRandomTags(filterTags),
       }));
 
       await new Promise((r) => setTimeout(r, 600));
@@ -185,13 +187,9 @@ export default function InteractiveGallery() {
     [loading],
   );
 
-  // ฟังก์ชันสลับ/เพิ่ม/ลด Tag
   const toggleFilter = (tag: string) => {
-    setActiveFilters(
-      (prev) =>
-        prev.includes(tag)
-          ? prev.filter((t) => t !== tag) // ถ้ามีอยู่แล้ว ให้ลบออก
-          : [...prev, tag], // ถ้ายังไม่มี ให้เพิ่มเข้าไป
+    setActiveFilters((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
   };
 
@@ -220,7 +218,6 @@ export default function InteractiveGallery() {
     }
   };
 
-  // ดักจับเมื่อ Array ของ activeFilters มีการเปลี่ยนแปลง
   useEffect(() => {
     setHasScrolled(false);
     fetchImages(8, activeFilters, true);
@@ -279,7 +276,7 @@ export default function InteractiveGallery() {
             className="flex overflow-x-auto gap-3 items-center w-full px-2 sm:px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
           >
             <button
-              onClick={() => setActiveFilters([])} // กด All คือล้าง Array
+              onClick={() => setActiveFilters([])}
               className={`flex-shrink-0 px-6 py-3 rounded-full font-bold transition-all ${
                 activeFilters.length === 0
                   ? "bg-gray-800 text-white dark:bg-white dark:text-black shadow-md scale-105"
@@ -335,7 +332,7 @@ export default function InteractiveGallery() {
           )}
         </div>
 
-        {/* --- Selected Tags Area (โผล่มาเมื่อมีการเลือก) --- */}
+        {/* --- Selected Tags Area --- */}
         {activeFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 px-6 sm:px-10 mt-1 animate-fadeIn">
             <span className="text-sm font-medium text-gray-500 dark:text-zinc-400 mr-1">
@@ -370,7 +367,6 @@ export default function InteractiveGallery() {
               </span>
             ))}
 
-            {/* ปุ่ม Clear All (แสดงเมื่อเลือกมากกว่า 1 แท็ก) */}
             {activeFilters.length > 1 && (
               <button
                 onClick={() => setActiveFilters([])}
@@ -420,7 +416,6 @@ export default function InteractiveGallery() {
         image={selectedImage}
         onClose={() => setSelectedImage(null)}
         onSelectTag={(tag) => {
-          // ถ้ากดจาก Modal และ tag นั้นยังไม่ได้เลือก ให้เพิ่มเข้าไป
           if (!activeFilters.includes(tag)) {
             toggleFilter(tag);
           }

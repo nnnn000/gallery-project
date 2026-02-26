@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Masonry from "react-masonry-css";
 import { useInView } from "react-intersection-observer";
 
-// --- ข้อมูล Tags และรูปภาพจำลองสำหรับ Navbar ---
+// --- ข้อมูล Tags และรูปภาพจำลองสำหรับ Navbar (เพิ่มจำนวนให้เยอะขึ้น) ---
 const TAG_CATEGORIES = [
   { tag: "#anime", img: "https://picsum.photos/seed/anime/50/50" },
   { tag: "#male_character", img: "https://picsum.photos/seed/male/50/50" },
@@ -14,16 +14,22 @@ const TAG_CATEGORIES = [
   { tag: "#fantasy", img: "https://picsum.photos/seed/fantasy/50/50" },
   { tag: "#nature", img: "https://picsum.photos/seed/nature/50/50" },
   { tag: "#portrait", img: "https://picsum.photos/seed/portrait/50/50" },
+  { tag: "#cityscape", img: "https://picsum.photos/seed/city/50/50" },
+  { tag: "#mecha", img: "https://picsum.photos/seed/mecha/50/50" },
+  { tag: "#food", img: "https://picsum.photos/seed/food/50/50" },
+  { tag: "#animals", img: "https://picsum.photos/seed/animals/50/50" },
+  { tag: "#vintage", img: "https://picsum.photos/seed/vintage/50/50" },
+  { tag: "#watercolor", img: "https://picsum.photos/seed/watercolor/50/50" },
+  { tag: "#3d_render", img: "https://picsum.photos/seed/3d/50/50" },
 ];
 
 const MOCK_TAGS_LIST = TAG_CATEGORIES.map((t) => t.tag);
 
-// ฟังก์ชันสุ่ม Tag แบบกำหนดให้มี Tag บังคับได้ (เพื่อจำลองระบบค้นหา)
+// ฟังก์ชันสุ่ม Tag แบบกำหนดให้มี Tag บังคับได้
 const getRandomTags = (forceTag: string | null = null) => {
   const shuffled = [...MOCK_TAGS_LIST].sort(() => 0.5 - Math.random());
   let selected = shuffled.slice(0, Math.floor(Math.random() * 3) + 2);
 
-  // ถ้ามีการเลือก Tag (Filter) ต้องมั่นใจว่าในรูปนั้นมี Tag นี้อยู่
   if (forceTag && !selected.includes(forceTag)) {
     selected[0] = forceTag;
   }
@@ -113,8 +119,8 @@ const TagModal = ({
               <button
                 key={tag}
                 onClick={() => {
-                  onSelectTag(tag); // เมื่อกดให้ส่งค่า Tag กลับไป Filter
-                  onClose(); // แล้วปิด Modal ทันที
+                  onSelectTag(tag);
+                  onClose();
                 }}
                 className="px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-sm font-semibold hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-all shadow-sm cursor-pointer"
               >
@@ -141,16 +147,17 @@ export default function InteractiveGallery() {
   const [loading, setLoading] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
-
-  // State ใหม่: สำหรับเก็บ Tag ที่กำลังใช้ Filter อยู่ (null = แสดงทั้งหมด)
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  // สร้าง Ref เพื่ออ้างอิงถึงกล่องที่ใช้ Scroll แถบเมนู
+  const navScrollRef = useRef<HTMLDivElement>(null);
 
   const { ref, inView } = useInView({
     threshold: 0,
     rootMargin: "200px",
   });
 
-  // ฟังก์ชันดึงรูปภาพ (รองรับการ Filter และ Reset หน้าจอ)
+  // ฟังก์ชันดึงรูปภาพ
   const fetchImages = useCallback(
     async (
       limit: number,
@@ -165,10 +172,10 @@ export default function InteractiveGallery() {
         url: `https://picsum.photos/seed/${Math.random()}/500/${Math.floor(
           Math.random() * 300 + 400,
         )}`,
-        tags: getRandomTags(filterTag), // บังคับใส่ Tag ที่ Filter ไว้
+        tags: getRandomTags(filterTag),
       }));
 
-      await new Promise((r) => setTimeout(r, 600)); // จำลองดีเลย์
+      await new Promise((r) => setTimeout(r, 600));
 
       setImages((prev) => (isReset ? newItems : [...prev, ...newItems]));
       setLoading(false);
@@ -176,17 +183,24 @@ export default function InteractiveGallery() {
     [loading],
   );
 
-  // เอฟเฟกต์ทำงานเมื่อ "ตัวกรอง (activeFilter) เปลี่ยนแปลง"
-  useEffect(() => {
-    setHasScrolled(false); // รีเซ็ตสถานะการ Scroll
-    fetchImages(12, activeFilter, true); // สั่งโหลดรูปใหม่ 12 รูป และลบรูปเก่าทิ้ง (isReset = true)
+  // ฟังก์ชันสำหรับกดปุ่มเลื่อน Nav bar ซ้าย-ขวา
+  const scrollNav = (direction: "left" | "right") => {
+    if (navScrollRef.current) {
+      const scrollAmount = 300; // ระยะการเลื่อนแต่ละครั้ง
+      navScrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth",
+      });
+    }
+  };
 
-    // เลื่อนจอขึ้นไปบนสุดเบาๆ เวลาเปลี่ยนหมวดหมู่
+  useEffect(() => {
+    setHasScrolled(false);
+    fetchImages(12, activeFilter, true);
     window.scrollTo({ top: 0, behavior: "smooth" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilter]);
 
-  // ดักฟังการ Scroll (ทำซ้ำเมื่อมีการเปลี่ยน Filter แล้วดึงลงมาใหม่)
   useEffect(() => {
     const handleScroll = () => {
       if (window.scrollY > 50 && !hasScrolled) {
@@ -197,7 +211,6 @@ export default function InteractiveGallery() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [hasScrolled]);
 
-  // Infinite Scroll โหลดเพิ่มเมื่อเลื่อนลงมาสุด
   useEffect(() => {
     if (inView && !loading && hasScrolled) {
       fetchImages(8, activeFilter, false);
@@ -207,10 +220,36 @@ export default function InteractiveGallery() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 bg-gray-50 dark:bg-zinc-950 min-h-screen transition-colors duration-300">
-      {/* --- Navigation Bar (หมวดหมู่) --- */}
-      <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-4 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-gray-200 dark:border-zinc-800">
-        <div className="flex overflow-x-auto gap-3 items-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
-          {/* ปุ่ม "All" (ล้างตัวกรอง) */}
+      {/* --- Navigation Bar (หมวดหมู่) พร้อมปุ่มเลื่อน --- */}
+      <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-4 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-gray-200 dark:border-zinc-800 flex items-center group/nav">
+        {/* ปุ่มเลื่อนซ้าย (จะจางตอนไม่ได้ Hover กล่อง Nav) */}
+        <button
+          onClick={() => scrollNav("left")}
+          className="absolute left-0 z-10 w-10 h-10 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
+        >
+          {/* SVG ลูกศรซ้าย */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="w-5 h-5 text-gray-700 dark:text-gray-300"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15.75 19.5L8.25 12l7.5-7.5"
+            />
+          </svg>
+        </button>
+
+        {/* คอนเทนเนอร์สำหรับเลื่อนแท็ก */}
+        <div
+          ref={navScrollRef}
+          className="flex overflow-x-auto gap-3 items-center w-full px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
+        >
+          {/* ปุ่ม "All" */}
           <button
             onClick={() => setActiveFilter(null)}
             className={`flex-shrink-0 px-6 py-3 rounded-full font-bold transition-all ${
@@ -233,17 +272,37 @@ export default function InteractiveGallery() {
                   : "bg-white text-gray-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-zinc-700 border border-transparent dark:border-zinc-700"
               }`}
             >
-              {/* ด้านซ้ายเป็นรูป */}
               <img
                 src={item.img}
                 alt={item.tag}
                 className="w-8 h-8 rounded-full object-cover border border-white/20"
               />
-              {/* ด้านขวาเป็นชื่อ Tag */}
               <span>{item.tag}</span>
             </button>
           ))}
         </div>
+
+        {/* ปุ่มเลื่อนขวา */}
+        <button
+          onClick={() => scrollNav("right")}
+          className="absolute right-0 z-10 w-10 h-10 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
+        >
+          {/* SVG ลูกศรขวา */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth={2}
+            stroke="currentColor"
+            className="w-5 h-5 text-gray-700 dark:text-gray-300"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M8.25 4.5l7.5 7.5-7.5 7.5"
+            />
+          </svg>
+        </button>
       </div>
 
       {/* --- Gallery Grid --- */}
@@ -283,7 +342,7 @@ export default function InteractiveGallery() {
       <TagModal
         image={selectedImage}
         onClose={() => setSelectedImage(null)}
-        onSelectTag={(tag) => setActiveFilter(tag)} // โยงฟังก์ชัน Filter มาที่ Modal ด้วย
+        onSelectTag={(tag) => setActiveFilter(tag)}
       />
     </div>
   );

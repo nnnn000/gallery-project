@@ -25,12 +25,14 @@ const TAG_CATEGORIES = [
 
 const MOCK_TAGS_LIST = TAG_CATEGORIES.map((t) => t.tag);
 
+// จำลองให้บางรูปได้ Tag เยอะๆ เพื่อทดสอบการ Scroll ใน Modal
 const getRandomTags = (forceTags: string[] = []) => {
   const shuffled = [...MOCK_TAGS_LIST]
     .filter((t) => !forceTags.includes(t))
     .sort(() => 0.5 - Math.random());
 
-  const extraCount = Math.floor(Math.random() * 3) + 1;
+  // สุ่มให้ได้ 5-10 แท็ก เพื่อให้เห็นผลลัพธ์การเลื่อน (Scroll) ชัดเจน
+  const extraCount = Math.floor(Math.random() * 6) + 5;
   const selected = [...forceTags, ...shuffled.slice(0, extraCount)];
 
   return selected;
@@ -43,7 +45,6 @@ const Skeleton = ({ height }: { height: number }) => (
   />
 );
 
-// --- ImageCard Component ---
 const ImageCard = ({
   image,
   onOpenModal,
@@ -56,7 +57,6 @@ const ImageCard = ({
 
   return (
     <div
-      // กดที่รูปตรงไหนก็ได้เพื่อเปิด Modal
       className="group mb-4 relative overflow-hidden rounded-xl shadow-sm bg-gray-200 dark:bg-zinc-800 cursor-pointer"
       onClick={() => onOpenModal(image)}
     >
@@ -70,9 +70,6 @@ const ImageCard = ({
         onLoad={() => setIsLoaded(true)}
       />
 
-      {/* ซ่อนปุ่ม # บนมือถือ (ใช้ hidden md:flex) 
-        จะแสดงเฉพาะตอน Hover บนจอใหญ่เท่านั้น (md:opacity-0 md:group-hover:opacity-100) 
-      */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -86,7 +83,7 @@ const ImageCard = ({
   );
 };
 
-// --- Modal Component ---
+// --- Modal Component (อัปเดตการ Scroll Tags และล็อคปุ่ม Close) ---
 const TagModal = ({
   image,
   onClose,
@@ -104,40 +101,49 @@ const TagModal = ({
       onClick={onClose}
     >
       <div
+        // จำกัดความสูงของ Modal สูงสุดแค่ 90vh (90% ของหน้าจอ)
         className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden flex flex-col md:flex-row max-w-4xl w-full max-h-[90vh] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex-1 bg-zinc-100 dark:bg-zinc-950 flex items-center justify-center p-4">
+        {/* รูปภาพ (มือถือให้สูง 40% ของจอ, บนคอมพิวเตอร์ขยายเต็ม) */}
+        <div className="flex-shrink-0 bg-zinc-100 dark:bg-zinc-950 flex items-center justify-center p-4 h-[40vh] md:h-auto md:flex-1 md:min-h-0">
           <img
             src={image.url}
             alt="Selected content"
-            className="max-h-[50vh] md:max-h-[80vh] w-auto object-contain rounded-lg shadow-md"
+            className="max-h-full w-auto object-contain rounded-lg shadow-md"
           />
         </div>
 
-        <div className="w-full md:w-80 p-8 flex flex-col border-l border-gray-100 dark:border-zinc-800">
-          <h3 className="text-2xl font-bold mb-6 text-gray-800 dark:text-zinc-100">
+        {/* ส่วนข้อมูลด้านขวา (ล็อคความสูงและบังคับให้ลูกๆ ไม่ทะลุกรอบด้วย min-h-0) */}
+        <div className="flex flex-col flex-1 min-h-0 w-full md:w-80 p-5 md:p-8 border-t md:border-t-0 md:border-l border-gray-100 dark:border-zinc-800">
+          {/* Header (ตรึงไว้) */}
+          <h3 className="text-xl md:text-2xl font-bold mb-4 flex-shrink-0 text-gray-800 dark:text-zinc-100">
             Image Tags
           </h3>
 
-          <div className="flex flex-wrap gap-2 mb-auto">
-            {image.tags.map((tag: string) => (
-              <button
-                key={tag}
-                onClick={() => {
-                  onSelectTag(tag);
-                  onClose();
-                }}
-                className="px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-sm font-semibold hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-all shadow-sm cursor-pointer"
-              >
-                {tag}
-              </button>
-            ))}
+          {/* --- พื้นที่ Scroll ของ Tags (หัวใจหลักอยู่ตรงนี้) --- */}
+          {/* flex-1 และ overflow-y-auto จะทำให้กล่องนี้ยืดออกจนสุดพื้นที่ที่เหลือ และ Scroll ตัวเองเมื่อข้อมูลเกิน */}
+          <div className="flex-1 min-h-0 overflow-y-auto pr-2 mb-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+            <div className="flex flex-wrap gap-2">
+              {image.tags.map((tag: string) => (
+                <button
+                  key={tag}
+                  onClick={() => {
+                    onSelectTag(tag);
+                    onClose();
+                  }}
+                  className="px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-sm font-semibold hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-all shadow-sm cursor-pointer"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
           </div>
 
+          {/* Close Button (ตรึงไว้ด้านล่างสุดเสมอ) */}
           <button
             onClick={onClose}
-            className="mt-8 w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl font-medium transition-colors"
+            className="flex-shrink-0 w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl font-medium transition-colors"
           >
             Close
           </button>
@@ -157,9 +163,12 @@ export default function InteractiveGallery() {
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   const navScrollRef = useRef<HTMLDivElement>(null);
-
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const selectedNavScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollSelectedLeft, setCanScrollSelectedLeft] = useState(false);
+  const [canScrollSelectedRight, setCanScrollSelectedRight] = useState(false);
 
   const { ref, inView } = useInView({
     threshold: 0,
@@ -193,28 +202,56 @@ export default function InteractiveGallery() {
     );
   };
 
-  const checkNavScroll = () => {
+  const checkNavScroll = useCallback(() => {
     if (navScrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = navScrollRef.current;
       setCanScrollLeft(scrollLeft > 2);
       setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2);
     }
-  };
-
-  useEffect(() => {
-    checkNavScroll();
-    window.addEventListener("resize", checkNavScroll);
-    return () => window.removeEventListener("resize", checkNavScroll);
   }, []);
 
-  const scrollNav = (direction: "left" | "right") => {
-    if (navScrollRef.current) {
+  const checkSelectedNavScroll = useCallback(() => {
+    if (selectedNavScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } =
+        selectedNavScrollRef.current;
+      setCanScrollSelectedLeft(scrollLeft > 2);
+      setCanScrollSelectedRight(
+        Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2,
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      checkNavScroll();
+      checkSelectedNavScroll();
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [checkNavScroll, checkSelectedNavScroll]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      checkSelectedNavScroll();
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [activeFilters, checkSelectedNavScroll]);
+
+  const scrollNav = (
+    direction: "left" | "right",
+    isSelectedNav: boolean = false,
+  ) => {
+    const targetRef = isSelectedNav ? selectedNavScrollRef : navScrollRef;
+    const targetCheck = isSelectedNav ? checkSelectedNavScroll : checkNavScroll;
+
+    if (targetRef.current) {
       const scrollAmount = 300;
-      navScrollRef.current.scrollBy({
+      targetRef.current.scrollBy({
         left: direction === "left" ? -scrollAmount : scrollAmount,
         behavior: "smooth",
       });
-      setTimeout(checkNavScroll, 400);
+      setTimeout(targetCheck, 400);
     }
   };
 
@@ -245,8 +282,8 @@ export default function InteractiveGallery() {
   return (
     <div className="max-w-7xl mx-auto p-4 bg-gray-50 dark:bg-zinc-950 min-h-screen transition-colors duration-300">
       {/* --- Navigation & Selected Tags Container --- */}
-      <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-4 mb-6 -mx-4 sm:mx-0 border-b border-gray-200 dark:border-zinc-800">
-        {/* --- Scrollable Nav --- */}
+      <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-2 mb-6 -mx-4 sm:mx-0 border-b border-gray-200 dark:border-zinc-800">
+        {/* --- 1. Main Scrollable Nav --- */}
         <div className="relative flex items-center group/nav overflow-hidden sm:overflow-visible px-4 sm:px-0 mb-3">
           {canScrollLeft && (
             <button
@@ -332,47 +369,97 @@ export default function InteractiveGallery() {
           )}
         </div>
 
-        {/* --- Selected Tags Area --- */}
+        {/* --- 2. Selected Tags Area --- */}
         {activeFilters.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 px-6 sm:px-10 mt-1 animate-fadeIn">
-            <span className="text-sm font-medium text-gray-500 dark:text-zinc-400 mr-1">
-              Selected:
-            </span>
-            {activeFilters.map((tag) => (
-              <span
-                key={tag}
-                className="flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded-lg text-sm font-semibold shadow-sm border border-blue-200 dark:border-blue-800"
-              >
-                {tag}
-                <button
-                  onClick={() => toggleFilter(tag)}
-                  className="hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors text-blue-600 dark:text-blue-300 hover:text-red-500 dark:hover:text-red-400"
-                  title="Remove"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </span>
-            ))}
-
-            {activeFilters.length > 1 && (
+          <div className="relative flex items-center group/selectedNav px-4 sm:px-0 mt-1 pb-2">
+            {canScrollSelectedLeft && (
               <button
-                onClick={() => setActiveFilters([])}
-                className="text-sm text-gray-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 underline ml-2 transition-colors font-medium"
+                onClick={() => scrollNav("left", true)}
+                className="absolute left-0 z-10 w-8 h-8 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/selectedNav:opacity-100 transition-opacity duration-300 hover:scale-105"
               >
-                Clear all
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-4 h-4 text-gray-700 dark:text-gray-300"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15.75 19.5L8.25 12l7.5-7.5"
+                  />
+                </svg>
+              </button>
+            )}
+
+            <div
+              ref={selectedNavScrollRef}
+              onScroll={checkSelectedNavScroll}
+              className="flex overflow-x-auto items-center gap-2 w-full px-2 sm:px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
+            >
+              <span className="flex-shrink-0 text-sm font-medium text-gray-500 dark:text-zinc-400 mr-1">
+                Selected:
+              </span>
+              {activeFilters.map((tag) => (
+                <span
+                  key={tag}
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded-lg text-sm font-semibold shadow-sm border border-blue-200 dark:border-blue-800"
+                >
+                  {tag}
+                  <button
+                    onClick={() => toggleFilter(tag)}
+                    className="hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors text-blue-600 dark:text-blue-300 hover:text-red-500 dark:hover:text-red-400"
+                    title="Remove"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+
+              {activeFilters.length > 1 && (
+                <button
+                  onClick={() => setActiveFilters([])}
+                  className="flex-shrink-0 text-sm text-gray-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 underline ml-2 transition-colors font-medium"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+
+            {canScrollSelectedRight && (
+              <button
+                onClick={() => scrollNav("right", true)}
+                className="absolute right-0 z-10 w-8 h-8 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/selectedNav:opacity-100 transition-opacity duration-300 hover:scale-105"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="w-4 h-4 text-gray-700 dark:text-gray-300"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                  />
+                </svg>
               </button>
             )}
           </div>

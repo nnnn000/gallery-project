@@ -4,24 +4,30 @@ import { useState, useEffect, useCallback } from "react";
 import Masonry from "react-masonry-css";
 import { useInView } from "react-intersection-observer";
 
-// --- รายชื่อ Tag จำลอง ---
-const MOCK_TAGS = [
-  "#anime",
-  "#male_character",
-  "#female_character",
-  "#scenery",
-  "#cyberpunk",
-  "#fantasy",
-  "#nature",
-  "#portrait",
-  "#architecture",
-  "#minimal",
+// --- ข้อมูล Tags และรูปภาพจำลองสำหรับ Navbar ---
+const TAG_CATEGORIES = [
+  { tag: "#anime", img: "https://picsum.photos/seed/anime/50/50" },
+  { tag: "#male_character", img: "https://picsum.photos/seed/male/50/50" },
+  { tag: "#female_character", img: "https://picsum.photos/seed/female/50/50" },
+  { tag: "#scenery", img: "https://picsum.photos/seed/scenery/50/50" },
+  { tag: "#cyberpunk", img: "https://picsum.photos/seed/cyber/50/50" },
+  { tag: "#fantasy", img: "https://picsum.photos/seed/fantasy/50/50" },
+  { tag: "#nature", img: "https://picsum.photos/seed/nature/50/50" },
+  { tag: "#portrait", img: "https://picsum.photos/seed/portrait/50/50" },
 ];
 
-// ฟังก์ชันสุ่ม Tag (ได้ 2-4 แท็กต่อรูป)
-const getRandomTags = () => {
-  const shuffled = [...MOCK_TAGS].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, Math.floor(Math.random() * 3) + 2);
+const MOCK_TAGS_LIST = TAG_CATEGORIES.map((t) => t.tag);
+
+// ฟังก์ชันสุ่ม Tag แบบกำหนดให้มี Tag บังคับได้ (เพื่อจำลองระบบค้นหา)
+const getRandomTags = (forceTag: string | null = null) => {
+  const shuffled = [...MOCK_TAGS_LIST].sort(() => 0.5 - Math.random());
+  let selected = shuffled.slice(0, Math.floor(Math.random() * 3) + 2);
+
+  // ถ้ามีการเลือก Tag (Filter) ต้องมั่นใจว่าในรูปนั้นมี Tag นี้อยู่
+  if (forceTag && !selected.includes(forceTag)) {
+    selected[0] = forceTag;
+  }
+  return selected;
 };
 
 // --- Skeleton Component ---
@@ -35,10 +41,10 @@ const Skeleton = ({ height }: { height: number }) => (
 // --- ImageCard Component ---
 const ImageCard = ({
   image,
-  onTagClick,
+  onOpenModal,
 }: {
   image: any;
-  onTagClick: (img: any) => void;
+  onOpenModal: (img: any) => void;
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [randomHeight] = useState(Math.floor(Math.random() * 200 + 250));
@@ -55,13 +61,12 @@ const ImageCard = ({
         onLoad={() => setIsLoaded(true)}
       />
 
-      {/* ปุ่ม # ที่จะโผล่มาเมื่อ Hover */}
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onTagClick(image);
+          onOpenModal(image);
         }}
-        className="absolute bottom-4 right-4 w-10 h-10 bg-white/80 dark:bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-white dark:hover:bg-black text-gray-800 dark:text-gray-200 shadow-md font-bold text-lg cursor-pointer z-10"
+        className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 dark:bg-black/80 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:scale-110 text-gray-800 dark:text-gray-200 shadow-lg font-bold text-lg cursor-pointer z-10"
       >
         #
       </button>
@@ -70,47 +75,57 @@ const ImageCard = ({
 };
 
 // --- Modal Component ---
-const TagModal = ({ image, onClose }: { image: any; onClose: () => void }) => {
+const TagModal = ({
+  image,
+  onClose,
+  onSelectTag,
+}: {
+  image: any;
+  onClose: () => void;
+  onSelectTag: (tag: string) => void;
+}) => {
   if (!image) return null;
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
+      className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
       onClick={onClose}
     >
       <div
         className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden flex flex-col md:flex-row max-w-4xl w-full max-h-[90vh] shadow-2xl"
-        onClick={(e) => e.stopPropagation()} // ป้องกันการคลิกข้างในแล้ว Modal ปิด
+        onClick={(e) => e.stopPropagation()}
       >
-        {/* ด้านซ้าย: รูปภาพ */}
-        <div className="flex-1 bg-gray-100 dark:bg-zinc-800 flex items-center justify-center p-4">
+        <div className="flex-1 bg-zinc-100 dark:bg-zinc-950 flex items-center justify-center p-4">
           <img
             src={image.url}
             alt="Selected content"
-            className="max-h-[50vh] md:max-h-[80vh] w-auto object-contain rounded-lg shadow-sm"
+            className="max-h-[50vh] md:max-h-[80vh] w-auto object-contain rounded-lg shadow-md"
           />
         </div>
 
-        {/* ด้านขวา: Tags */}
-        <div className="w-full md:w-80 p-8 flex flex-col border-l border-gray-200 dark:border-zinc-800">
+        <div className="w-full md:w-80 p-8 flex flex-col border-l border-gray-100 dark:border-zinc-800">
           <h3 className="text-2xl font-bold mb-6 text-gray-800 dark:text-zinc-100">
             Image Tags
           </h3>
 
           <div className="flex flex-wrap gap-2 mb-auto">
             {image.tags.map((tag: string) => (
-              <span
+              <button
                 key={tag}
-                className="px-3 py-1.5 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 rounded-lg text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-900/60 transition-colors cursor-pointer"
+                onClick={() => {
+                  onSelectTag(tag); // เมื่อกดให้ส่งค่า Tag กลับไป Filter
+                  onClose(); // แล้วปิด Modal ทันที
+                }}
+                className="px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-sm font-semibold hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-all shadow-sm cursor-pointer"
               >
                 {tag}
-              </span>
+              </button>
             ))}
           </div>
 
           <button
             onClick={onClose}
-            className="mt-8 w-full py-3 bg-gray-200 hover:bg-gray-300 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl font-medium transition-colors"
+            className="mt-8 w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl font-medium transition-colors"
           >
             Close
           </button>
@@ -125,17 +140,23 @@ export default function InteractiveGallery() {
   const [images, setImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
-
-  // State สำหรับเก็บรูปภาพที่ถูกเลือกมาเปิด Modal
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
+
+  // State ใหม่: สำหรับเก็บ Tag ที่กำลังใช้ Filter อยู่ (null = แสดงทั้งหมด)
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   const { ref, inView } = useInView({
     threshold: 0,
-    rootMargin: "100px",
+    rootMargin: "200px",
   });
 
+  // ฟังก์ชันดึงรูปภาพ (รองรับการ Filter และ Reset หน้าจอ)
   const fetchImages = useCallback(
-    async (limit: number) => {
+    async (
+      limit: number,
+      filterTag: string | null,
+      isReset: boolean = false,
+    ) => {
       if (loading) return;
       setLoading(true);
 
@@ -144,71 +165,126 @@ export default function InteractiveGallery() {
         url: `https://picsum.photos/seed/${Math.random()}/500/${Math.floor(
           Math.random() * 300 + 400,
         )}`,
-        tags: getRandomTags(), // สุ่ม Tag ให้แต่ละรูป
+        tags: getRandomTags(filterTag), // บังคับใส่ Tag ที่ Filter ไว้
       }));
 
-      await new Promise((r) => setTimeout(r, 800));
-      setImages((prev) => [...prev, ...newItems]);
+      await new Promise((r) => setTimeout(r, 600)); // จำลองดีเลย์
+
+      setImages((prev) => (isReset ? newItems : [...prev, ...newItems]));
       setLoading(false);
     },
     [loading],
   );
 
+  // เอฟเฟกต์ทำงานเมื่อ "ตัวกรอง (activeFilter) เปลี่ยนแปลง"
   useEffect(() => {
-    fetchImages(8);
-  }, []);
+    setHasScrolled(false); // รีเซ็ตสถานะการ Scroll
+    fetchImages(12, activeFilter, true); // สั่งโหลดรูปใหม่ 12 รูป และลบรูปเก่าทิ้ง (isReset = true)
 
+    // เลื่อนจอขึ้นไปบนสุดเบาๆ เวลาเปลี่ยนหมวดหมู่
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilter]);
+
+  // ดักฟังการ Scroll (ทำซ้ำเมื่อมีการเปลี่ยน Filter แล้วดึงลงมาใหม่)
   useEffect(() => {
-    const handleFirstScroll = () => {
-      if (window.scrollY > 10) {
+    const handleScroll = () => {
+      if (window.scrollY > 50 && !hasScrolled) {
         setHasScrolled(true);
-        window.removeEventListener("scroll", handleFirstScroll);
       }
     };
-    window.addEventListener("scroll", handleFirstScroll);
-    return () => window.removeEventListener("scroll", handleFirstScroll);
-  }, []);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [hasScrolled]);
 
+  // Infinite Scroll โหลดเพิ่มเมื่อเลื่อนลงมาสุด
   useEffect(() => {
     if (inView && !loading && hasScrolled) {
-      fetchImages(8);
+      fetchImages(8, activeFilter, false);
     }
-  }, [inView, loading, fetchImages, hasScrolled]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView, hasScrolled]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 bg-gray-50 dark:bg-zinc-950 min-h-screen transition-colors duration-300">
-      <h1 className="text-2xl font-bold mb-8 text-center text-gray-800 dark:text-zinc-100">
-        My Gallery
-      </h1>
+      {/* --- Navigation Bar (หมวดหมู่) --- */}
+      <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-4 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-gray-200 dark:border-zinc-800">
+        <div className="flex overflow-x-auto gap-3 items-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+          {/* ปุ่ม "All" (ล้างตัวกรอง) */}
+          <button
+            onClick={() => setActiveFilter(null)}
+            className={`flex-shrink-0 px-6 py-3 rounded-full font-bold transition-all ${
+              activeFilter === null
+                ? "bg-gray-800 text-white dark:bg-white dark:text-black shadow-md scale-105"
+                : "bg-white text-gray-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700"
+            }`}
+          >
+            All
+          </button>
 
-      <Masonry
-        breakpointCols={{ default: 4, 1100: 3, 700: 2, 500: 1 }}
-        className="flex w-auto -ml-4"
-        columnClassName="pl-4"
-      >
-        {images.map((img) => (
-          <ImageCard
-            key={img.id}
-            image={img}
-            onTagClick={(selected) => setSelectedImage(selected)}
-          />
-        ))}
-      </Masonry>
+          {/* รายการปุ่ม Tags */}
+          {TAG_CATEGORIES.map((item) => (
+            <button
+              key={item.tag}
+              onClick={() => setActiveFilter(item.tag)}
+              className={`flex-shrink-0 flex items-center gap-2 pr-5 pl-2 py-2 rounded-full font-medium transition-all ${
+                activeFilter === item.tag
+                  ? "bg-blue-600 text-white shadow-md scale-105"
+                  : "bg-white text-gray-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-zinc-700 border border-transparent dark:border-zinc-700"
+              }`}
+            >
+              {/* ด้านซ้ายเป็นรูป */}
+              <img
+                src={item.img}
+                alt={item.tag}
+                className="w-8 h-8 rounded-full object-cover border border-white/20"
+              />
+              {/* ด้านขวาเป็นชื่อ Tag */}
+              <span>{item.tag}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* Sentinel */}
+      {/* --- Gallery Grid --- */}
+      {images.length === 0 && !loading ? (
+        <div className="h-64 flex items-center justify-center text-gray-500">
+          No images found.
+        </div>
+      ) : (
+        <Masonry
+          breakpointCols={{ default: 4, 1100: 3, 700: 2, 500: 1 }}
+          className="flex w-auto -ml-4"
+          columnClassName="pl-4"
+        >
+          {images.map((img) => (
+            <ImageCard
+              key={img.id}
+              image={img}
+              onOpenModal={(selected) => setSelectedImage(selected)}
+            />
+          ))}
+        </Masonry>
+      )}
+
+      {/* --- Sentinel: จุดตรวจจับ --- */}
       <div
         ref={ref}
         className="h-20 w-full flex items-center justify-center mt-10"
       >
         {loading && (
           <div className="flex flex-col items-center gap-2">
-            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         )}
       </div>
 
-      {/* Modal โชว์ตอนมีรูปภาพถูกเลือก */}
-      <TagModal image={selectedImage} onClose={() => setSelectedImage(null)} />
+      {/* --- Modal แสดงข้อมูลรูปภาพ --- */}
+      <TagModal
+        image={selectedImage}
+        onClose={() => setSelectedImage(null)}
+        onSelectTag={(tag) => setActiveFilter(tag)} // โยงฟังก์ชัน Filter มาที่ Modal ด้วย
+      />
     </div>
   );
 }

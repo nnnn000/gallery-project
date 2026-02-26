@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Masonry from "react-masonry-css";
 import { useInView } from "react-intersection-observer";
 
-// --- ข้อมูล Tags และรูปภาพจำลองสำหรับ Navbar (เพิ่มจำนวนให้เยอะขึ้น) ---
+// --- ข้อมูล Tags และรูปภาพจำลองสำหรับ Navbar ---
 const TAG_CATEGORIES = [
   { tag: "#anime", img: "https://picsum.photos/seed/anime/50/50" },
   { tag: "#male_character", img: "https://picsum.photos/seed/male/50/50" },
@@ -25,7 +25,6 @@ const TAG_CATEGORIES = [
 
 const MOCK_TAGS_LIST = TAG_CATEGORIES.map((t) => t.tag);
 
-// ฟังก์ชันสุ่ม Tag แบบกำหนดให้มี Tag บังคับได้
 const getRandomTags = (forceTag: string | null = null) => {
   const shuffled = [...MOCK_TAGS_LIST].sort(() => 0.5 - Math.random());
   let selected = shuffled.slice(0, Math.floor(Math.random() * 3) + 2);
@@ -36,7 +35,6 @@ const getRandomTags = (forceTag: string | null = null) => {
   return selected;
 };
 
-// --- Skeleton Component ---
 const Skeleton = ({ height }: { height: number }) => (
   <div
     className="w-full bg-gray-200 dark:bg-zinc-800 animate-pulse rounded-xl"
@@ -44,7 +42,6 @@ const Skeleton = ({ height }: { height: number }) => (
   />
 );
 
-// --- ImageCard Component ---
 const ImageCard = ({
   image,
   onOpenModal,
@@ -80,7 +77,6 @@ const ImageCard = ({
   );
 };
 
-// --- Modal Component ---
 const TagModal = ({
   image,
   onClose,
@@ -141,7 +137,6 @@ const TagModal = ({
   );
 };
 
-// --- Main Component ---
 export default function InteractiveGallery() {
   const [images, setImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -149,15 +144,16 @@ export default function InteractiveGallery() {
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
-  // สร้าง Ref เพื่ออ้างอิงถึงกล่องที่ใช้ Scroll แถบเมนู
   const navScrollRef = useRef<HTMLDivElement>(null);
+
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
   const { ref, inView } = useInView({
     threshold: 0,
     rootMargin: "200px",
   });
 
-  // ฟังก์ชันดึงรูปภาพ
   const fetchImages = useCallback(
     async (
       limit: number,
@@ -183,14 +179,34 @@ export default function InteractiveGallery() {
     [loading],
   );
 
-  // ฟังก์ชันสำหรับกดปุ่มเลื่อน Nav bar ซ้าย-ขวา
+  // ฟังก์ชันเช็กระยะการ Scroll ที่ปรับ Buffer เพิ่มเติมแล้ว
+  const checkNavScroll = () => {
+    if (navScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = navScrollRef.current;
+
+      // ใช้ > 2 เพื่อกันปัญหาติดเศษทศนิยมตอนอยู่ซ้ายสุด
+      setCanScrollLeft(scrollLeft > 2);
+
+      // ใช้ - 2 เพื่อทำ Buffer ฝั่งขวาสุด ถ้าเหลือระยะไม่ถึง 2px ให้ถือว่าสุดขอบและซ่อนปุ่ม
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2);
+    }
+  };
+
+  useEffect(() => {
+    checkNavScroll();
+    window.addEventListener("resize", checkNavScroll);
+    return () => window.removeEventListener("resize", checkNavScroll);
+  }, []);
+
   const scrollNav = (direction: "left" | "right") => {
     if (navScrollRef.current) {
-      const scrollAmount = 300; // ระยะการเลื่อนแต่ละครั้ง
+      const scrollAmount = 300;
       navScrollRef.current.scrollBy({
         left: direction === "left" ? -scrollAmount : scrollAmount,
         behavior: "smooth",
       });
+      // เพิ่มเวลาขึ้นเล็กน้อยให้ Smooth Scroll ทำงานจบชัวร์ๆ ก่อนเช็กระยะอีกที
+      setTimeout(checkNavScroll, 400);
     }
   };
 
@@ -220,36 +236,35 @@ export default function InteractiveGallery() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 bg-gray-50 dark:bg-zinc-950 min-h-screen transition-colors duration-300">
-      {/* --- Navigation Bar (หมวดหมู่) พร้อมปุ่มเลื่อน --- */}
-      <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-4 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-gray-200 dark:border-zinc-800 flex items-center group/nav">
-        {/* ปุ่มเลื่อนซ้าย (จะจางตอนไม่ได้ Hover กล่อง Nav) */}
-        <button
-          onClick={() => scrollNav("left")}
-          className="absolute left-0 z-10 w-10 h-10 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
-        >
-          {/* SVG ลูกศรซ้าย */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className="w-5 h-5 text-gray-700 dark:text-gray-300"
+      {/* --- Navigation Bar --- */}
+      <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-4 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0 border-b border-gray-200 dark:border-zinc-800 flex items-center group/nav relative overflow-hidden sm:overflow-visible">
+        {canScrollLeft && (
+          <button
+            onClick={() => scrollNav("left")}
+            className="absolute left-0 z-10 w-10 h-10 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15.75 19.5L8.25 12l7.5-7.5"
-            />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-5 h-5 text-gray-700 dark:text-gray-300"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 19.5L8.25 12l7.5-7.5"
+              />
+            </svg>
+          </button>
+        )}
 
-        {/* คอนเทนเนอร์สำหรับเลื่อนแท็ก */}
         <div
           ref={navScrollRef}
-          className="flex overflow-x-auto gap-3 items-center w-full px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
+          onScroll={checkNavScroll}
+          className="flex overflow-x-auto gap-3 items-center w-full px-2 sm:px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
         >
-          {/* ปุ่ม "All" */}
           <button
             onClick={() => setActiveFilter(null)}
             className={`flex-shrink-0 px-6 py-3 rounded-full font-bold transition-all ${
@@ -261,7 +276,6 @@ export default function InteractiveGallery() {
             All
           </button>
 
-          {/* รายการปุ่ม Tags */}
           {TAG_CATEGORIES.map((item) => (
             <button
               key={item.tag}
@@ -282,27 +296,27 @@ export default function InteractiveGallery() {
           ))}
         </div>
 
-        {/* ปุ่มเลื่อนขวา */}
-        <button
-          onClick={() => scrollNav("right")}
-          className="absolute right-0 z-10 w-10 h-10 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
-        >
-          {/* SVG ลูกศรขวา */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className="w-5 h-5 text-gray-700 dark:text-gray-300"
+        {canScrollRight && (
+          <button
+            onClick={() => scrollNav("right")}
+            className="absolute right-0 z-10 w-10 h-10 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M8.25 4.5l7.5 7.5-7.5 7.5"
-            />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2}
+              stroke="currentColor"
+              className="w-5 h-5 text-gray-700 dark:text-gray-300"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8.25 4.5l7.5 7.5-7.5 7.5"
+              />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* --- Gallery Grid --- */}
@@ -338,7 +352,6 @@ export default function InteractiveGallery() {
         )}
       </div>
 
-      {/* --- Modal แสดงข้อมูลรูปภาพ --- */}
       <TagModal
         image={selectedImage}
         onClose={() => setSelectedImage(null)}

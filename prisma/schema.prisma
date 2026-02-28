@@ -1,0 +1,45 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Artwork {
+  id          BigInt   @id
+  imageUrl    String?  @map("image_url") @db.Text
+  createdAt   DateTime @default(now())
+  uploadedAt  DateTime @map("created_at")
+  uploaderId  BigInt   @map("uploader_id") // uploader id ก็อาจจะเยอะได้เช่นกัน
+  score       Int      @default(0)
+  source      String?  @db.Text // ใช้ Text เผื่อ URL ยาวมากๆ
+  md5         String   @unique
+  rating      String   @db.VarChar(10)
+  imageWidth  Int      @map("image_width")
+  imageHeight Int      @map("image_height")
+  fileExt     String   @map("file_ext")
+  fileSize    Int      @map("file_size")
+  pixivId     BigInt?  @map("pixiv_id") // Pixiv ID ปัจจุบันเลขเยอะมาก ต้องใช้ BigInt
+
+  tags Tag[] @relation("ArtworkToTag")
+
+  @@map("artworks") // ตั้งชื่อ table ใน DB เป็นตัวเล็ก (นิยมใน SQL)
+}
+
+model Tag {
+  id       BigInt @id
+  name     String @unique
+  category Int // Category ปกติเลขไม่เยอะ (0-5) ใช้ Int ได้ครับ
+
+  artworks Artwork[] @relation("ArtworkToTag")
+
+  @@map("tags")
+}

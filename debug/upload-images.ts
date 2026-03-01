@@ -4,7 +4,7 @@ dotenv.config();
 import * as fs from "fs";
 import * as path from "path";
 // 💡 เพิ่มคำสั่ง list เข้ามา
-import { put, list } from "@vercel/blob";
+import { put, list, ListBlobResult } from "@vercel/blob";
 
 async function uploadFolder() {
   const folderPath =
@@ -27,7 +27,7 @@ async function uploadFolder() {
   try {
     // ใช้ Loop เผื่อกรณีที่คุณมีไฟล์บน Vercel เกิน 1,000 ไฟล์ (Pagination)
     while (hasMore) {
-      const listResult = await list({
+      const listResult: ListBlobResult = await list({
         cursor: cursor,
         limit: 1000,
       });

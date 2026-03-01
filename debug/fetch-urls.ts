@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { list } from "@vercel/blob";
+import { list, ListBlobResult } from "@vercel/blob";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -15,7 +15,7 @@ async function syncBlobToData() {
     let cursor: string | undefined = undefined;
 
     while (hasMore) {
-      const result = await list({
+      const result: ListBlobResult = await list({
         cursor: cursor,
         limit: 1000,
       });

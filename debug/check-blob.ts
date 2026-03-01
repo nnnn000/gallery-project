@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { list } from "@vercel/blob";
+import { list, ListBlobResult } from "@vercel/blob";
 
 async function checkTotalFiles() {
   console.log("⏳ กำลังนับจำนวนไฟล์บน Vercel Blob...");
@@ -13,7 +13,7 @@ async function checkTotalFiles() {
   try {
     // วนลูปนับไฟล์จนกว่าจะหมด (รองรับกรณีมีไฟล์เกิน 1,000 รูป)
     while (hasMore) {
-      const listResult = await list({
+      const listResult: ListBlobResult = await list({
         cursor: cursor,
         limit: 1000,
       });

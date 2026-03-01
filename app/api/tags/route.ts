@@ -1,4 +1,7 @@
 // app/api/tags/route.ts
+
+export const dynamic = "force-dynamic"; // 👈 บังคับให้ข้าม Cache ทุกครั้งที่มีการเรียก
+
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 

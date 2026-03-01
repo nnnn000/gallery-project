@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic"; // 👈 บังคับให้ข้าม Cache ทุกครั้งที่มีการเรียก
+
 // app/api/artworks/route.ts
 import { NextRequest, NextResponse } from "next/server";
 // 1. เปลี่ยนการ import มาใช้ตัวแปรที่เราสร้างไว้ใน lib

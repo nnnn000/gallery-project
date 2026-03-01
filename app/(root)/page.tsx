@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import Masonry from "react-masonry-css";
+import { Masonry } from "react-plock";
 import { useInView } from "react-intersection-observer";
 
 // --- Components ย่อย ---
@@ -21,6 +21,7 @@ const ImageCard = ({
       style={{
         aspectRatio: `${image.imageWidth} / ${image.imageHeight}`,
         width: "100%",
+        maxHeight: "600px",
       }}
       onClick={() => onOpenModal(image)}
     >
@@ -147,8 +148,8 @@ export default function InteractiveGallery() {
   const getInitialLimit = useCallback(() => {
     if (typeof window === "undefined") return 12;
     const width = window.innerWidth;
-    if (width >= 1600) return 40;
-    if (width >= 1300) return 30;
+    if (width >= 1600) return 60;
+    if (width >= 1300) return 50;
     return 12;
   }, []);
 
@@ -238,9 +239,15 @@ export default function InteractiveGallery() {
   const checkNavScroll = useCallback(() => {
     if (navScrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = navScrollRef.current;
-      setCanScrollLeft(scrollLeft > 2);
-      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 5);
 
+      // เช็คฝั่งซ้าย: ถ้าเลื่อนออกมามากกว่า 5px ให้โชว์ปุ่มซ้าย
+      setCanScrollLeft(scrollLeft > 5);
+
+      // เช็คฝั่งขวา: ปรับระยะเผื่อเป็น 10px (จากเดิม -5 หรือ -2)
+      // เพื่อให้ปุ่มขวาโผล่มาทันทีที่ลิสต์ยาวขึ้น
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 10);
+
+      // ส่วนของ Infinite Load Tag (เหมือนเดิม)
       if (
         scrollLeft + clientWidth >= scrollWidth - 400 &&
         !isFetchingTagsRef.current &&
@@ -301,6 +308,15 @@ export default function InteractiveGallery() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [checkNavScroll]);
+
+  useEffect(() => {
+    // ให้รอจังหวะที่ DOM อัปเดต Tag ใหม่เสร็จก่อนนิดนึง (100ms) แล้วค่อยเช็ค
+    const timeout = setTimeout(() => {
+      checkNavScroll();
+    }, 100);
+
+    return () => clearTimeout(timeout);
+  }, [tagCategories, checkNavScroll]); // ทำงานทุกครั้งที่ลิสต์ Tag เปลี่ยนแปลง
 
   const toggleFilter = (tag: string) => {
     setActiveFilters((prev) =>
@@ -452,25 +468,18 @@ export default function InteractiveGallery() {
       </div>
 
       <Masonry
-        breakpointCols={{
-          default: 8,
-          1600: 6,
-          1300: 5,
-          1100: 4,
-          700: 2,
-          500: 1,
+        items={images} // 👈 ส่ง Array ของรูปเข้าไปเลย
+        config={{
+          columns: [1, 2, 3, 4, 5, 6, 7], // 👈 จำนวนเสาตามขนาดหน้าจอ (มือถือ -> จอใหญ่)
+          gap: [16, 16, 16, 16, 16, 16, 16], // 👈 ระยะห่างระหว่างรูป (หน่วยเป็น px)
+          media: [640, 768, 1024, 1280, 1536, 1892], // 👈 Breakpoints ของหน้าจอ
         }}
-        className="flex w-auto -ml-4"
-        columnClassName="pl-4"
-      >
-        {images.map((img, index) => (
-          <ImageCard
-            key={`${img.id}-${index}`} // 💡 ใช้ ID ผสมกับ Index เพื่อความชัวร์ว่าไม่ซ้ำแน่ๆ
-            image={img}
-            onOpenModal={setSelectedImage}
-          />
-        ))}
-      </Masonry>
+        render={(
+          img, // 👈 เขียนวิธี Render แต่ละรูปตรงนี้
+        ) => (
+          <ImageCard key={img.id} image={img} onOpenModal={setSelectedImage} />
+        )}
+      />
 
       <div
         ref={ref}

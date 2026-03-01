@@ -15,33 +15,43 @@ const ImageCard = ({
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // คำนวณสัดส่วนเพื่อใช้กับ Aspect Ratio
+  const width = image.imageWidth || 300;
+  const height = image.imageHeight || 400;
+
   return (
     <div
-      className="group mb-4 relative overflow-hidden rounded-xl bg-gray-200 dark:bg-zinc-800 cursor-pointer"
+      className="group relative mb-4 overflow-hidden rounded-xl bg-gray-200 dark:bg-zinc-800 cursor-pointer w-full"
       style={{
-        aspectRatio: `${image.imageWidth} / ${image.imageHeight}`,
-        width: "100%",
-        maxHeight: "600px",
+        // 💡 หัวใจสำคัญ: จองพื้นที่ไว้ตามสัดส่วนจริง เพื่อให้ Masonry เฉลี่ยเสาได้เท่ากันตั้งแต่แรก
+        aspectRatio: `${width} / ${height}`,
+        maxHeight: "600px", // 💡 ป้องกันรูปที่ยาวเกินไปมาดึงค่าเฉลี่ยเสาจนเพี้ยน
       }}
       onClick={() => onOpenModal(image)}
     >
+      {/* Loading Placeholder */}
       {!isLoaded && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center animate-pulse bg-gray-200 dark:bg-zinc-800">
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-gray-200 dark:bg-zinc-800 animate-pulse">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
-          <span className="text-[10px] text-gray-400 font-bold uppercase">
+          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
             Loading
           </span>
         </div>
       )}
 
+      {/* Image Element */}
       <img
         src={image.imageUrl || "/placeholder.jpg"}
         alt="Gallery content"
-        className={`w-full h-full object-cover transition-opacity duration-700 ${
-          isLoaded ? "opacity-100" : "opacity-0"
-        } group-hover:scale-105 transition-transform duration-500`}
+        loading="lazy"
+        className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${
+          isLoaded ? "opacity-100 scale-100" : "opacity-0 scale-110"
+        } group-hover:scale-105`}
         onLoad={() => setIsLoaded(true)}
       />
+
+      {/* Hover Overlay (Optional: เพิ่มความสวยงาม) */}
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300" />
     </div>
   );
 };
@@ -245,7 +255,7 @@ export default function InteractiveGallery() {
 
       // เช็คฝั่งขวา: ปรับระยะเผื่อเป็น 10px (จากเดิม -5 หรือ -2)
       // เพื่อให้ปุ่มขวาโผล่มาทันทีที่ลิสต์ยาวขึ้น
-      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 10);
+      // setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 10);
 
       // ส่วนของ Infinite Load Tag (เหมือนเดิม)
       if (

@@ -2,53 +2,42 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const limit = parseInt(searchParams.get("limit") || "30"); // เริ่มต้นที่ 30
+  const skip = parseInt(searchParams.get("skip") || "0");
+
   try {
-    // 1. ดึง Tags ทั้งหมด พร้อมรูปภาพที่เกี่ยวข้องทั้งหมด (ไม่ใช่แค่ 1)
-    // เพื่อให้เรามี "ตัวเลือก" กรณีรูปแรกซ้ำกับ Tag อื่น
-    const tagsWithArtworks = await prisma.tag.findMany({
-      include: {
+    const tags = await prisma.tag.findMany({
+      take: limit,
+      skip: skip,
+      orderBy: { name: "asc" },
+      // 💡 เปลี่ยนจาก include เป็น select เพื่อดึงเฉพาะข้อมูลที่จำเป็นจริงๆ
+      select: {
+        name: true,
         artworks: {
+          take: 1, // ดึงแค่รูปเดียว
           select: {
-            id: true,
-            imageUrl: true,
+            imageUrl: true, // และดึงเฉพาะ URL มาเลย ไม่ต้องดึง ID หรือฟิลด์อื่น
           },
-          orderBy: { createdAt: "desc" }, // เอารูปล่าสุดก่อน
         },
       },
     });
 
-    const usedArtworkIds = new Set<string>(); // เก็บ ID รูปที่ถูกเลือกไปแล้ว
-    const formattedTags = [];
+    const formattedTags = tags.map((t) => ({
+      tag: t.name,
+      img: t.artworks[0]?.imageUrl || "/placeholder.jpg",
+    }));
 
-    // 2. วนลูปคัดเลือกรูปให้แต่ละ Tag โดยไม่ให้ซ้ำกัน
-    for (const tag of tagsWithArtworks) {
-      // ค้นหารูปแรกใน Tag นี้ที่ยังไม่เคยถูกใช้เป็นไอคอนของ Tag อื่น
-      const uniqueArtwork = tag.artworks.find(
-        (art) => !usedArtworkIds.has(art.id.toString()),
-      );
-
-      if (uniqueArtwork) {
-        usedArtworkIds.add(uniqueArtwork.id.toString());
-        formattedTags.push({
-          tag: tag.name,
-          img: uniqueArtwork.imageUrl,
-        });
-      } else if (tag.artworks.length > 0) {
-        // กรณีเลวร้ายที่สุด: ทุกรูปใน Tag นี้ถูก Tag อื่นแย่งไปหมดแล้ว
-        // ให้ยอมใช้รูปแรกของมัน (ยอมซ้ำดีกว่าไม่มีรูป)
-        formattedTags.push({
-          tag: tag.name,
-          img: tag.artworks[0].imageUrl,
-        });
-      }
-    }
-
-    return NextResponse.json(formattedTags);
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch tags" },
-      { status: 500 },
+    const jsonString = JSON.stringify(formattedTags, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value,
     );
+
+    return new Response(jsonString, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
   }
 }

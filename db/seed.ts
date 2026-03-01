@@ -27,16 +27,35 @@ async function main() {
   console.log(`📊 พบข้อมูลทั้งหมด ${artworks.length} รายการ`);
 
   let count = 0;
+  let skippedCount = 0;
+  let updatedCount = 0;
+
   for (const item of artworks) {
     count++;
-    // แสดง Log ทุกๆ 10 รายการเพื่อไม่ให้รกหน้าจอ แต่ให้รู้ว่าเครื่องยังไม่ค้าง
-    if (count % 10 === 0 || count === 1) {
-      console.log(
-        `⏳ กำลังจัดการรายการที่ ${count}/${artworks.length} (ID: ${item.id})`,
-      );
-    }
 
     try {
+      // 💡 1. ให้ Prisma แอบไปส่องดูใน DB ก่อนว่า ID นี้มีอยู่หรือยัง
+      // (ใช้ select ให้ดึงมาแค่ imageUrl จะได้ไม่กินแรม)
+      const existingArtwork = await prisma.artwork.findUnique({
+        where: { id: BigInt(item.id) },
+        select: { imageUrl: true },
+      });
+
+      // 💡 2. เช็คเงื่อนไข: ถ้ามีข้อมูลนี้ใน DB แล้ว "และ" imageUrl ไม่ใช่ null ให้ข้ามเลย!
+      if (existingArtwork && existingArtwork.imageUrl !== null) {
+        // console.log(`⏭️ ข้าม ID: ${item.id} -> มี URL ในฐานข้อมูลแล้ว`); // (เปิดคอมเมนต์นี้ถ้าอยากเห็น Log การข้าม)
+        skippedCount++;
+        continue; // กระโดดข้ามไปทำรอบถัดไปทันที
+      }
+
+      // แสดง Log แจ้งเตือนสถานะสำหรับตัวที่จะอัปเดตจริงๆ
+      if (updatedCount % 10 === 0 || updatedCount === 1) {
+        console.log(
+          `⏳ กำลังอัปเดต/สร้าง ID: ${item.id} (รายการที่ ${count}/${artworks.length})`,
+        );
+      }
+
+      // 💡 3. ถ้าไม่มีข้อมูลใน DB หรือ imageUrl ยังเป็น null อยู่ โค้ดส่วนนี้ถึงจะทำงาน
       await prisma.artwork.upsert({
         where: { id: BigInt(item.id) },
         update: {
@@ -69,12 +88,18 @@ async function main() {
           },
         },
       });
+
+      updatedCount++;
     } catch (err) {
       console.error(`❌ ผิดพลาดที่ ID ${item.id}:`, err);
     }
   }
 
+  console.log("\n==================================");
   console.log("✅ Seed ข้อมูลเสร็จสิ้น!");
+  console.log(`อัปเดต/เพิ่มใหม่สำเร็จ: ${updatedCount} รายการ`);
+  console.log(`ข้าม (มีรูปใน DB แล้ว): ${skippedCount} รายการ`);
+  console.log("==================================\n");
 }
 
 main()

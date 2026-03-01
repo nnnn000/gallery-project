@@ -79,19 +79,21 @@ const TagModal = ({
           </h3>
           <div className="flex-1 overflow-y-auto pr-2 mb-4">
             <div className="flex flex-wrap gap-2">
-              {image.tags.map((tag: string) => {
-                const isActive = activeFilters.includes(tag);
+              {image.tags.map((tagItem: any) => {
+                const tagName =
+                  typeof tagItem === "string" ? tagItem : tagItem.name;
+                const isActive = activeFilters.includes(tagName);
                 return (
                   <button
-                    key={tag}
-                    onClick={() => onSelectTag(tag)}
+                    key={tagName}
+                    onClick={() => onSelectTag(tagName)}
                     className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2 shadow-sm ${
                       isActive
                         ? "bg-blue-600 text-white hover:bg-red-500"
                         : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100"
                     }`}
                   >
-                    #{tag}
+                    #{tagName}
                     {isActive && (
                       <span className="text-xs bg-white/20 rounded-full p-0.5">
                         ✕
@@ -116,139 +118,189 @@ const TagModal = ({
 
 // --- Main Component ---
 export default function InteractiveGallery() {
-  const [images, setImages] = useState<any[]>([]);
-  const [tagCategories, setTagCategories] = useState<
-    { tag: string; img: string }[]
-  >([]);
-  const [loading, setLoading] = useState(false);
-  const [isLastPage, setIsLastPage] = useState(false);
-  const [hasScrolled, setHasScrolled] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<any | null>(null);
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
-
-  const isFetchingRef = useRef(false);
+  const isFetchingTagsRef = useRef(false);
+  const isFetchingImagesRef = useRef(false);
   const navScrollRef = useRef<HTMLDivElement>(null);
   const selectedTagsContainerRef = useRef<HTMLDivElement>(null);
 
+  const [tagSkip, setTagSkip] = useState(0);
+  const [isTagsLoading, setIsTagsLoading] = useState(false);
+  const [isTagsLastPage, setIsTagsLastPage] = useState(false);
+  const [tagCategories, setTagCategories] = useState<
+    { tag: string; img: string }[]
+  >([]);
+
+  const [images, setImages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isImagesLastPage, setIsImagesLastPage] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [hasScrolled, setHasScrolled] = useState(false);
+
+  const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-
   const [isSelectedOverflowing, setIsSelectedOverflowing] = useState(false);
   const [showAllSelectedModal, setShowAllSelectedModal] = useState(false);
 
-  const { ref, inView } = useInView({ threshold: 0, rootMargin: "200px" });
+  const { ref, inView } = useInView({ threshold: 0, rootMargin: "600px" });
+
+  const getInitialLimit = useCallback(() => {
+    if (typeof window === "undefined") return 12;
+    const width = window.innerWidth;
+    if (width >= 1600) return 40;
+    if (width >= 1300) return 30;
+    return 12;
+  }, []);
+
+  // --- Functions ---
+  const fetchTags = useCallback(
+    async (reset = false) => {
+      if (isFetchingTagsRef.current || (isTagsLastPage && !reset)) return;
+      isFetchingTagsRef.current = true;
+      setIsTagsLoading(true);
+
+      const currentSkip = reset ? 0 : tagSkip;
+      const limit = reset ? 30 : 20;
+
+      try {
+        const response = await fetch(
+          `/api/tags?limit=${limit}&skip=${currentSkip}`,
+        );
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          if (reset) {
+            setTagCategories(data);
+            setTagSkip(data.length);
+            setIsTagsLastPage(data.length < limit);
+          } else {
+            setTagCategories((prev) => [...prev, ...data]);
+            setTagSkip((prev) => prev + data.length);
+            if (data.length < limit) setIsTagsLastPage(true);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsTagsLoading(false);
+        isFetchingTagsRef.current = false;
+      }
+    },
+    [tagSkip, isTagsLastPage],
+  );
+
+  const fetchImages = useCallback(
+    async (limit: number, filterTags: string[], isReset: boolean = false) => {
+      if (isFetchingImagesRef.current || (isImagesLastPage && !isReset)) return;
+      isFetchingImagesRef.current = true;
+      setLoading(true);
+
+      try {
+        setImages((prevImages) => {
+          const currentImagesCount = isReset ? 0 : prevImages.length;
+
+          fetch(
+            `/api/artworks?limit=${limit}&skip=${currentImagesCount}&tags=${encodeURIComponent(filterTags.join(","))}`,
+          )
+            .then((res) => res.json())
+            .then((newItems) => {
+              if (Array.isArray(newItems)) {
+                setIsImagesLastPage(newItems.length < limit);
+
+                setImages((prev) => {
+                  if (isReset) return newItems;
+
+                  // 💡 จุดที่แก้ไข: กรองเอาเฉพาะรูปที่ ID ไม่ซ้ำกับที่มีอยู่เดิม
+                  const existingIds = new Set(prev.map((img) => img.id));
+                  const uniqueNewItems = newItems.filter(
+                    (img) => !existingIds.has(img.id),
+                  );
+
+                  return [...prev, ...uniqueNewItems];
+                });
+              }
+            })
+            .catch((err) => console.error("❌ Fetch Artworks Error:", err))
+            .finally(() => {
+              setLoading(false);
+              isFetchingImagesRef.current = false;
+            });
+
+          return prevImages;
+        });
+      } catch (error) {
+        setLoading(false);
+        isFetchingImagesRef.current = false;
+      }
+    },
+    [isImagesLastPage],
+  );
 
   const checkNavScroll = useCallback(() => {
     if (navScrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = navScrollRef.current;
       setCanScrollLeft(scrollLeft > 2);
-      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2);
-    }
-  }, []);
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 5);
 
-  const checkSelectedOverflow = useCallback(() => {
-    if (selectedTagsContainerRef.current) {
-      const { scrollWidth, clientWidth } = selectedTagsContainerRef.current;
-      setIsSelectedOverflowing(scrollWidth > clientWidth + 2);
-    }
-  }, []);
-
-  const fetchTags = useCallback(async () => {
-    try {
-      const response = await fetch("/api/tags");
-      const data = await response.json();
-      if (Array.isArray(data)) setTagCategories(data);
-    } catch (error) {
-      console.error("❌ Failed to fetch tags:", error);
-    }
-  }, []);
-
-  const fetchImages = useCallback(
-    async (limit: number, filterTags: string[], isReset: boolean = false) => {
-      if (isFetchingRef.current || (isLastPage && !isReset)) return;
-
-      isFetchingRef.current = true;
-      setLoading(true);
-
-      try {
-        const skip = isReset ? 0 : images.length;
-        const response = await fetch(
-          `/api/artworks?limit=${limit}&skip=${skip}&tags=${filterTags.join(",")}`,
-        );
-        if (!response.ok) throw new Error("Fetch failed");
-        const newItems = await response.json();
-
-        if (Array.isArray(newItems)) {
-          setIsLastPage(newItems.length < limit);
-          setImages((prev) => (isReset ? newItems : [...prev, ...newItems]));
-        }
-      } catch (error) {
-        console.error("❌ Fetch error:", error);
-      } finally {
-        setTimeout(() => {
-          setLoading(false);
-          isFetchingRef.current = false;
-        }, 300);
+      if (
+        scrollLeft + clientWidth >= scrollWidth - 400 &&
+        !isFetchingTagsRef.current &&
+        !isTagsLastPage
+      ) {
+        fetchTags();
       }
-    },
-    [images.length, isLastPage],
-  );
+    }
+  }, [fetchTags, isTagsLastPage]);
 
-  const getInitialLimit = () => {
-    if (typeof window === "undefined") return 12;
-    const width = window.innerWidth;
-    if (width >= 1600) return 48;
-    if (width >= 1300) return 36;
-    if (width >= 1100) return 30;
-    if (width >= 700) return 24;
-    return 6;
-  };
+  // --- Effects ---
 
+  // 1. Initial Tags load
   useEffect(() => {
-    fetchTags();
-  }, [fetchTags]);
+    fetchTags(true);
+  }, []);
 
+  // 2. เมื่อมีการ Scroll ครั้งแรก (ปลดล็อค Infinite Scroll)
   useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) setHasScrolled(true);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // 3. จัดการการ Reset เมื่อเปลี่ยน Filter (แยกจาก Scroll Load)
+  useEffect(() => {
+    setIsImagesLastPage(false);
     setHasScrolled(false);
-    setIsLastPage(false);
     fetchImages(getInitialLimit(), activeFilters, true);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [activeFilters]);
+  }, [activeFilters]); // รันเฉพาะตอนเลือก Tag ใหม่เท่านั้น
+
+  // 4. Infinite Scroll (โหลดเพิ่มเมื่อไถลงมา)
+  useEffect(() => {
+    if (inView && !loading && !isImagesLastPage && hasScrolled) {
+      fetchImages(getInitialLimit(), activeFilters, false);
+    }
+  }, [
+    inView,
+    loading,
+    isImagesLastPage,
+    hasScrolled,
+    activeFilters,
+    fetchImages,
+    getInitialLimit,
+  ]);
 
   useEffect(() => {
     const handleResize = () => {
       checkNavScroll();
-      checkSelectedOverflow();
+      if (selectedTagsContainerRef.current) {
+        const { scrollWidth, clientWidth } = selectedTagsContainerRef.current;
+        setIsSelectedOverflowing(scrollWidth > clientWidth + 2);
+      }
     };
     window.addEventListener("resize", handleResize);
-    handleResize();
     return () => window.removeEventListener("resize", handleResize);
-  }, [checkNavScroll, checkSelectedOverflow, tagCategories]);
-
-  useEffect(() => {
-    const timeout = setTimeout(checkSelectedOverflow, 50);
-    return () => clearTimeout(timeout);
-  }, [activeFilters, checkSelectedOverflow]);
-
-  useEffect(() => {
-    if (
-      inView &&
-      !loading &&
-      !isFetchingRef.current &&
-      hasScrolled &&
-      !isLastPage
-    ) {
-      fetchImages(getInitialLimit(), activeFilters, false);
-    }
-  }, [inView, loading, hasScrolled, isLastPage, activeFilters, fetchImages]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50 && !hasScrolled) setHasScrolled(true);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [hasScrolled]);
+  }, [checkNavScroll]);
 
   const toggleFilter = (tag: string) => {
     setActiveFilters((prev) =>
@@ -269,12 +321,11 @@ export default function InteractiveGallery() {
   return (
     <div className="max-w-full w-full p-4 bg-gray-50 dark:bg-zinc-950 min-h-screen transition-colors duration-300">
       <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-2 mb-6 -mx-4 sm:mx-0 border-b border-gray-200 dark:border-zinc-800">
-        {/* Navbar */}
         <div className="relative flex items-center group/nav overflow-hidden sm:overflow-visible px-4 sm:px-0 mb-3">
           {canScrollLeft && (
             <button
               onClick={() => scrollNav("left")}
-              className="absolute left-0 z-10 w-10 h-10 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300"
+              className="absolute left-0 z-10 w-10 h-10 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -282,7 +333,7 @@ export default function InteractiveGallery() {
                 viewBox="0 0 24 24"
                 strokeWidth={2.5}
                 stroke="currentColor"
-                className="w-5 h-5 text-gray-700 dark:text-gray-300"
+                className="w-5 h-5"
               >
                 <path
                   strokeLinecap="round"
@@ -325,11 +376,14 @@ export default function InteractiveGallery() {
                 <span>#{item.tag}</span>
               </button>
             ))}
+            {isTagsLoading && (
+              <div className="flex-shrink-0 w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            )}
           </div>
           {canScrollRight && (
             <button
               onClick={() => scrollNav("right")}
-              className="absolute right-0 z-10 w-10 h-10 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300"
+              className="absolute right-0 z-10 w-10 h-10 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -337,7 +391,7 @@ export default function InteractiveGallery() {
                 viewBox="0 0 24 24"
                 strokeWidth={2.5}
                 stroke="currentColor"
-                className="w-5 h-5 text-gray-700 dark:text-gray-300"
+                className="w-5 h-5"
               >
                 <path
                   strokeLinecap="round"
@@ -349,17 +403,13 @@ export default function InteractiveGallery() {
           )}
         </div>
 
-        {/* Selected Tags Area */}
         {activeFilters.length > 0 && (
           <div className="relative flex items-center px-4 sm:px-10 mt-1 pb-2 w-full">
-            {/* 💡 หุ้มคำว่า Selected และปุ่ม Clear all ให้อยู่ด้วยกันทางซ้ายสุด */}
             <div className="flex-shrink-0 flex items-center mr-3">
               <span className="text-sm font-medium text-gray-500">
                 Selected:
               </span>
-              {/* 💡 ปุ่ม Clear All จะแสดงเมื่อเลือก Tag มากกว่า 1 อัน */}
             </div>
-
             <div
               ref={selectedTagsContainerRef}
               className="flex items-center gap-2 overflow-hidden whitespace-nowrap w-full"
@@ -378,22 +428,20 @@ export default function InteractiveGallery() {
                   </button>
                 </span>
               ))}
-
               {activeFilters.length > 1 && (
                 <button
                   onClick={() => setActiveFilters([])}
-                  className="ml-2 text-sm font-bold text-red-500 hover:text-red-600 hover:underline bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 px-2 py-0.5 rounded transition-colors"
+                  className="ml-2 text-sm font-bold text-red-500 hover:text-red-600 hover:underline bg-red-50 hover:bg-red-100 dark:bg-red-500/10 px-2 py-0.5 rounded"
                 >
                   Clear all
                 </button>
               )}
             </div>
-
             {isSelectedOverflowing && (
-              <div className="absolute right-4 sm:right-10 top-0 bottom-2 flex items-center pl-8 bg-gradient-to-l from-gray-50 dark:from-zinc-950 via-gray-50/90 dark:via-zinc-950/90 to-transparent">
+              <div className="absolute right-4 sm:right-10 top-0 bottom-2 flex items-center pl-8 bg-gradient-to-l from-gray-50 dark:from-zinc-950 via-gray-50/90 to-transparent">
                 <button
                   onClick={() => setShowAllSelectedModal(true)}
-                  className="px-3 py-1 bg-white dark:bg-zinc-800 shadow-sm border border-gray-200 dark:border-zinc-700 rounded-lg text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 transition-colors"
+                  className="px-3 py-1 bg-white dark:bg-zinc-800 shadow-sm border border-gray-200 dark:border-zinc-700 rounded-lg text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100"
                 >
                   ...
                 </button>
@@ -415,36 +463,40 @@ export default function InteractiveGallery() {
         className="flex w-auto -ml-4"
         columnClassName="pl-4"
       >
-        {images.map((img) => (
+        {images.map((img, index) => (
           <ImageCard
-            key={img.id}
+            key={`${img.id}-${index}`} // 💡 ใช้ ID ผสมกับ Index เพื่อความชัวร์ว่าไม่ซ้ำแน่ๆ
             image={img}
-            onOpenModal={(selected) => setSelectedImage(selected)}
+            onOpenModal={setSelectedImage}
           />
         ))}
       </Masonry>
 
-      {!isLastPage ? (
-        <div
-          ref={ref}
-          className="h-20 w-full flex items-center justify-center mt-10"
-        >
-          {loading && (
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          )}
+      <div
+        ref={ref}
+        className="h-20 w-full flex items-center justify-center mt-10"
+      >
+        {loading && (
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        )}
+      </div>
+
+      {!isImagesLastPage && !hasScrolled && images.length > 0 && (
+        <div className="text-center py-4 text-gray-400 text-sm italic">
+          Scroll down to see more content...
         </div>
-      ) : (
-        images.length > 0 && (
-          <div className="text-center py-10 text-gray-500 font-medium">
-            — End of Gallery —
-          </div>
-        )
+      )}
+
+      {isImagesLastPage && images.length > 0 && (
+        <div className="text-center py-10 text-gray-500 font-medium">
+          — End of Gallery —
+        </div>
       )}
 
       <TagModal
         image={selectedImage}
         onClose={() => setSelectedImage(null)}
-        onSelectTag={(tag) => toggleFilter(tag)}
+        onSelectTag={toggleFilter}
         activeFilters={activeFilters}
       />
 
@@ -496,7 +548,7 @@ export default function InteractiveGallery() {
               </button>
               <button
                 onClick={() => setShowAllSelectedModal(false)}
-                className="px-6 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl font-bold hover:bg-gray-200 transition-colors"
+                className="px-6 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl font-bold"
               >
                 Close
               </button>

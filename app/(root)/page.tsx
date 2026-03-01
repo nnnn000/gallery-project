@@ -4,46 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Masonry from "react-masonry-css";
 import { useInView } from "react-intersection-observer";
 
-// --- ข้อมูล Tags และรูปภาพจำลองสำหรับ Navbar ---
-const TAG_CATEGORIES = [
-  { tag: "#anime", img: "https://picsum.photos/seed/anime/50/50" },
-  { tag: "#male_character", img: "https://picsum.photos/seed/male/50/50" },
-  { tag: "#female_character", img: "https://picsum.photos/seed/female/50/50" },
-  { tag: "#scenery", img: "https://picsum.photos/seed/scenery/50/50" },
-  { tag: "#cyberpunk", img: "https://picsum.photos/seed/cyber/50/50" },
-  { tag: "#fantasy", img: "https://picsum.photos/seed/fantasy/50/50" },
-  { tag: "#nature", img: "https://picsum.photos/seed/nature/50/50" },
-  { tag: "#portrait", img: "https://picsum.photos/seed/portrait/50/50" },
-  { tag: "#cityscape", img: "https://picsum.photos/seed/city/50/50" },
-  { tag: "#mecha", img: "https://picsum.photos/seed/mecha/50/50" },
-  { tag: "#food", img: "https://picsum.photos/seed/food/50/50" },
-  { tag: "#animals", img: "https://picsum.photos/seed/animals/50/50" },
-  { tag: "#vintage", img: "https://picsum.photos/seed/vintage/50/50" },
-  { tag: "#watercolor", img: "https://picsum.photos/seed/watercolor/50/50" },
-  { tag: "#3d_render", img: "https://picsum.photos/seed/3d/50/50" },
-];
-
-const MOCK_TAGS_LIST = TAG_CATEGORIES.map((t) => t.tag);
-
-// จำลองให้บางรูปได้ Tag เยอะๆ เพื่อทดสอบการ Scroll ใน Modal
-const getRandomTags = (forceTags: string[] = []) => {
-  const shuffled = [...MOCK_TAGS_LIST]
-    .filter((t) => !forceTags.includes(t))
-    .sort(() => 0.5 - Math.random());
-
-  // สุ่มให้ได้ 5-10 แท็ก เพื่อให้เห็นผลลัพธ์การเลื่อน (Scroll) ชัดเจน
-  const extraCount = Math.floor(Math.random() * 6) + 5;
-  const selected = [...forceTags, ...shuffled.slice(0, extraCount)];
-
-  return selected;
-};
-
-const Skeleton = ({ height }: { height: number }) => (
-  <div
-    className="w-full bg-gray-200 dark:bg-zinc-800 animate-pulse rounded-xl"
-    style={{ height: `${height}px` }}
-  />
-);
+// --- Components ย่อย ---
 
 const ImageCard = ({
   image,
@@ -53,97 +14,99 @@ const ImageCard = ({
   onOpenModal: (img: any) => void;
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [randomHeight] = useState(Math.floor(Math.random() * 200 + 250));
 
   return (
     <div
-      className="group mb-4 relative overflow-hidden rounded-xl shadow-sm bg-gray-200 dark:bg-zinc-800 cursor-pointer"
+      className="group mb-4 relative overflow-hidden rounded-xl bg-gray-200 dark:bg-zinc-800 cursor-pointer"
+      style={{
+        aspectRatio: `${image.imageWidth} / ${image.imageHeight}`,
+        width: "100%",
+      }}
       onClick={() => onOpenModal(image)}
     >
-      {!isLoaded && <Skeleton height={randomHeight} />}
+      {!isLoaded && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center animate-pulse bg-gray-200 dark:bg-zinc-800">
+          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
+          <span className="text-[10px] text-gray-400 font-bold uppercase">
+            Loading
+          </span>
+        </div>
+      )}
+
       <img
-        src={image.url}
+        src={image.imageUrl || "/placeholder.jpg"}
         alt="Gallery content"
-        className={`w-full h-auto object-cover transition-all duration-700 ${
-          isLoaded ? "opacity-100 scale-100" : "opacity-0 scale-95"
-        } group-hover:scale-105`}
+        className={`w-full h-full object-cover transition-opacity duration-700 ${
+          isLoaded ? "opacity-100" : "opacity-0"
+        } group-hover:scale-105 transition-transform duration-500`}
         onLoad={() => setIsLoaded(true)}
       />
-
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenModal(image);
-        }}
-        className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 dark:bg-black/80 backdrop-blur-sm rounded-full hidden md:flex items-center justify-center transition-all duration-300 hover:scale-110 text-gray-800 dark:text-gray-200 shadow-lg font-bold text-lg z-10 opacity-0 group-hover:opacity-100"
-      >
-        #
-      </button>
     </div>
   );
 };
 
-// --- Modal Component (อัปเดตการ Scroll Tags และล็อคปุ่ม Close) ---
 const TagModal = ({
   image,
   onClose,
   onSelectTag,
+  activeFilters,
 }: {
   image: any;
   onClose: () => void;
   onSelectTag: (tag: string) => void;
+  activeFilters: string[];
 }) => {
   if (!image) return null;
-
   return (
     <div
       className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
       onClick={onClose}
     >
       <div
-        // จำกัดความสูงของ Modal สูงสุดแค่ 90vh (90% ของหน้าจอ)
         className="bg-white dark:bg-zinc-900 rounded-2xl overflow-hidden flex flex-col md:flex-row max-w-4xl w-full max-h-[90vh] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* รูปภาพ (มือถือให้สูง 40% ของจอ, บนคอมพิวเตอร์ขยายเต็ม) */}
         <div className="flex-shrink-0 bg-zinc-100 dark:bg-zinc-950 flex items-center justify-center p-4 h-[40vh] md:h-auto md:flex-1 md:min-h-0">
           <img
-            src={image.url}
-            alt="Selected content"
+            src={image.imageUrl}
+            alt="Selected"
             className="max-h-full w-auto object-contain rounded-lg shadow-md"
           />
         </div>
-
-        {/* ส่วนข้อมูลด้านขวา (ล็อคความสูงและบังคับให้ลูกๆ ไม่ทะลุกรอบด้วย min-h-0) */}
         <div className="flex flex-col flex-1 min-h-0 w-full md:w-80 p-5 md:p-8 border-t md:border-t-0 md:border-l border-gray-100 dark:border-zinc-800">
-          {/* Header (ตรึงไว้) */}
-          <h3 className="text-xl md:text-2xl font-bold mb-4 flex-shrink-0 text-gray-800 dark:text-zinc-100">
+          <h3 className="text-xl md:text-2xl font-bold mb-4 text-gray-800 dark:text-zinc-100">
             Image Tags
           </h3>
-
-          {/* --- พื้นที่ Scroll ของ Tags (หัวใจหลักอยู่ตรงนี้) --- */}
-          {/* flex-1 และ overflow-y-auto จะทำให้กล่องนี้ยืดออกจนสุดพื้นที่ที่เหลือ และ Scroll ตัวเองเมื่อข้อมูลเกิน */}
-          <div className="flex-1 min-h-0 overflow-y-auto pr-2 mb-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb]:rounded-full">
+          <div className="flex-1 overflow-y-auto pr-2 mb-4">
             <div className="flex flex-wrap gap-2">
-              {image.tags.map((tag: string) => (
-                <button
-                  key={tag}
-                  onClick={() => {
-                    onSelectTag(tag);
-                    onClose();
-                  }}
-                  className="px-4 py-2 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-sm font-semibold hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 transition-all shadow-sm cursor-pointer"
-                >
-                  {tag}
-                </button>
-              ))}
+              {image.tags.map((tagItem: any) => {
+                const tagName =
+                  typeof tagItem === "string" ? tagItem : tagItem.name;
+                const isActive = activeFilters.includes(tagName);
+                return (
+                  <button
+                    key={tagName}
+                    onClick={() => onSelectTag(tagName)}
+                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-all flex items-center gap-2 shadow-sm ${
+                      isActive
+                        ? "bg-blue-600 text-white hover:bg-red-500"
+                        : "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-100"
+                    }`}
+                  >
+                    #{tagName}
+                    {isActive && (
+                      <span className="text-xs bg-white/20 rounded-full p-0.5">
+                        ✕
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          {/* Close Button (ตรึงไว้ด้านล่างสุดเสมอ) */}
           <button
             onClick={onClose}
-            className="flex-shrink-0 w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl font-medium transition-colors"
+            className="w-full py-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-800 dark:text-gray-200 rounded-xl font-medium transition-colors"
           >
             Close
           </button>
@@ -155,46 +118,189 @@ const TagModal = ({
 
 // --- Main Component ---
 export default function InteractiveGallery() {
+  const isFetchingTagsRef = useRef(false);
+  const isFetchingImagesRef = useRef(false);
+  const navScrollRef = useRef<HTMLDivElement>(null);
+  const selectedTagsContainerRef = useRef<HTMLDivElement>(null);
+
+  const [tagSkip, setTagSkip] = useState(0);
+  const [isTagsLoading, setIsTagsLoading] = useState(false);
+  const [isTagsLastPage, setIsTagsLastPage] = useState(false);
+  const [tagCategories, setTagCategories] = useState<
+    { tag: string; img: string }[]
+  >([]);
+
   const [images, setImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [hasScrolled, setHasScrolled] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<any | null>(null);
-
+  const [isImagesLastPage, setIsImagesLastPage] = useState(false);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const [hasScrolled, setHasScrolled] = useState(false);
 
-  const navScrollRef = useRef<HTMLDivElement>(null);
+  const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
+  const [isSelectedOverflowing, setIsSelectedOverflowing] = useState(false);
+  const [showAllSelectedModal, setShowAllSelectedModal] = useState(false);
 
-  const selectedNavScrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollSelectedLeft, setCanScrollSelectedLeft] = useState(false);
-  const [canScrollSelectedRight, setCanScrollSelectedRight] = useState(false);
+  const { ref, inView } = useInView({ threshold: 0, rootMargin: "600px" });
 
-  const { ref, inView } = useInView({
-    threshold: 0,
-    rootMargin: "200px",
-  });
+  const getInitialLimit = useCallback(() => {
+    if (typeof window === "undefined") return 12;
+    const width = window.innerWidth;
+    if (width >= 1600) return 40;
+    if (width >= 1300) return 30;
+    return 12;
+  }, []);
+
+  // --- Functions ---
+  const fetchTags = useCallback(
+    async (reset = false) => {
+      if (isFetchingTagsRef.current || (isTagsLastPage && !reset)) return;
+      isFetchingTagsRef.current = true;
+      setIsTagsLoading(true);
+
+      const currentSkip = reset ? 0 : tagSkip;
+      const limit = reset ? 30 : 20;
+
+      try {
+        const response = await fetch(
+          `/api/tags?limit=${limit}&skip=${currentSkip}`,
+        );
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          if (reset) {
+            setTagCategories(data);
+            setTagSkip(data.length);
+            setIsTagsLastPage(data.length < limit);
+          } else {
+            setTagCategories((prev) => [...prev, ...data]);
+            setTagSkip((prev) => prev + data.length);
+            if (data.length < limit) setIsTagsLastPage(true);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsTagsLoading(false);
+        isFetchingTagsRef.current = false;
+      }
+    },
+    [tagSkip, isTagsLastPage],
+  );
 
   const fetchImages = useCallback(
     async (limit: number, filterTags: string[], isReset: boolean = false) => {
-      if (loading) return;
+      if (isFetchingImagesRef.current || (isImagesLastPage && !isReset)) return;
+      isFetchingImagesRef.current = true;
       setLoading(true);
 
-      const newItems = Array.from({ length: limit }).map((_, i) => ({
-        id: Math.random().toString(36) + Date.now() + i,
-        url: `https://picsum.photos/seed/${Math.random()}/500/${Math.floor(
-          Math.random() * 300 + 400,
-        )}`,
-        tags: getRandomTags(filterTags),
-      }));
+      try {
+        setImages((prevImages) => {
+          const currentImagesCount = isReset ? 0 : prevImages.length;
 
-      await new Promise((r) => setTimeout(r, 600));
+          fetch(
+            `/api/artworks?limit=${limit}&skip=${currentImagesCount}&tags=${encodeURIComponent(filterTags.join(","))}`,
+          )
+            .then((res) => res.json())
+            .then((newItems) => {
+              if (Array.isArray(newItems)) {
+                setIsImagesLastPage(newItems.length < limit);
 
-      setImages((prev) => (isReset ? newItems : [...prev, ...newItems]));
-      setLoading(false);
+                setImages((prev) => {
+                  if (isReset) return newItems;
+
+                  // 💡 จุดที่แก้ไข: กรองเอาเฉพาะรูปที่ ID ไม่ซ้ำกับที่มีอยู่เดิม
+                  const existingIds = new Set(prev.map((img) => img.id));
+                  const uniqueNewItems = newItems.filter(
+                    (img) => !existingIds.has(img.id),
+                  );
+
+                  return [...prev, ...uniqueNewItems];
+                });
+              }
+            })
+            .catch((err) => console.error("❌ Fetch Artworks Error:", err))
+            .finally(() => {
+              setLoading(false);
+              isFetchingImagesRef.current = false;
+            });
+
+          return prevImages;
+        });
+      } catch (error) {
+        setLoading(false);
+        isFetchingImagesRef.current = false;
+      }
     },
-    [loading],
+    [isImagesLastPage],
   );
+
+  const checkNavScroll = useCallback(() => {
+    if (navScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = navScrollRef.current;
+      setCanScrollLeft(scrollLeft > 2);
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 5);
+
+      if (
+        scrollLeft + clientWidth >= scrollWidth - 400 &&
+        !isFetchingTagsRef.current &&
+        !isTagsLastPage
+      ) {
+        fetchTags();
+      }
+    }
+  }, [fetchTags, isTagsLastPage]);
+
+  // --- Effects ---
+
+  // 1. Initial Tags load
+  useEffect(() => {
+    fetchTags(true);
+  }, []);
+
+  // 2. เมื่อมีการ Scroll ครั้งแรก (ปลดล็อค Infinite Scroll)
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) setHasScrolled(true);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // 3. จัดการการ Reset เมื่อเปลี่ยน Filter (แยกจาก Scroll Load)
+  useEffect(() => {
+    setIsImagesLastPage(false);
+    setHasScrolled(false);
+    fetchImages(getInitialLimit(), activeFilters, true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [activeFilters]); // รันเฉพาะตอนเลือก Tag ใหม่เท่านั้น
+
+  // 4. Infinite Scroll (โหลดเพิ่มเมื่อไถลงมา)
+  useEffect(() => {
+    if (inView && !loading && !isImagesLastPage && hasScrolled) {
+      fetchImages(getInitialLimit(), activeFilters, false);
+    }
+  }, [
+    inView,
+    loading,
+    isImagesLastPage,
+    hasScrolled,
+    activeFilters,
+    fetchImages,
+    getInitialLimit,
+  ]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      checkNavScroll();
+      if (selectedTagsContainerRef.current) {
+        const { scrollWidth, clientWidth } = selectedTagsContainerRef.current;
+        setIsSelectedOverflowing(scrollWidth > clientWidth + 2);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [checkNavScroll]);
 
   const toggleFilter = (tag: string) => {
     setActiveFilters((prev) =>
@@ -202,101 +308,32 @@ export default function InteractiveGallery() {
     );
   };
 
-  const checkNavScroll = useCallback(() => {
+  const scrollNav = (direction: "left" | "right") => {
     if (navScrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = navScrollRef.current;
-      setCanScrollLeft(scrollLeft > 2);
-      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2);
-    }
-  }, []);
-
-  const checkSelectedNavScroll = useCallback(() => {
-    if (selectedNavScrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } =
-        selectedNavScrollRef.current;
-      setCanScrollSelectedLeft(scrollLeft > 2);
-      setCanScrollSelectedRight(
-        Math.ceil(scrollLeft + clientWidth) < scrollWidth - 2,
-      );
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleResize = () => {
-      checkNavScroll();
-      checkSelectedNavScroll();
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [checkNavScroll, checkSelectedNavScroll]);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      checkSelectedNavScroll();
-    }, 100);
-    return () => clearTimeout(timeout);
-  }, [activeFilters, checkSelectedNavScroll]);
-
-  const scrollNav = (
-    direction: "left" | "right",
-    isSelectedNav: boolean = false,
-  ) => {
-    const targetRef = isSelectedNav ? selectedNavScrollRef : navScrollRef;
-    const targetCheck = isSelectedNav ? checkSelectedNavScroll : checkNavScroll;
-
-    if (targetRef.current) {
-      const scrollAmount = 300;
-      targetRef.current.scrollBy({
-        left: direction === "left" ? -scrollAmount : scrollAmount,
+      navScrollRef.current.scrollBy({
+        left: direction === "left" ? -300 : 300,
         behavior: "smooth",
       });
-      setTimeout(targetCheck, 400);
+      setTimeout(checkNavScroll, 400);
     }
   };
 
-  useEffect(() => {
-    setHasScrolled(false);
-    fetchImages(8, activeFilters, true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFilters]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 50 && !hasScrolled) {
-        setHasScrolled(true);
-      }
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [hasScrolled]);
-
-  useEffect(() => {
-    if (inView && !loading && hasScrolled) {
-      fetchImages(8, activeFilters, false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, hasScrolled]);
-
   return (
-    <div className="max-w-7xl mx-auto p-4 bg-gray-50 dark:bg-zinc-950 min-h-screen transition-colors duration-300">
-      {/* --- Navigation & Selected Tags Container --- */}
+    <div className="max-w-full w-full p-4 bg-gray-50 dark:bg-zinc-950 min-h-screen transition-colors duration-300">
       <div className="sticky top-0 z-30 bg-gray-50/90 dark:bg-zinc-950/90 backdrop-blur-md pt-4 pb-2 mb-6 -mx-4 sm:mx-0 border-b border-gray-200 dark:border-zinc-800">
-        {/* --- 1. Main Scrollable Nav --- */}
         <div className="relative flex items-center group/nav overflow-hidden sm:overflow-visible px-4 sm:px-0 mb-3">
           {canScrollLeft && (
             <button
               onClick={() => scrollNav("left")}
-              className="absolute left-0 z-10 w-10 h-10 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
+              className="absolute left-0 z-10 w-10 h-10 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 stroke="currentColor"
-                className="w-5 h-5 text-gray-700 dark:text-gray-300"
+                className="w-5 h-5"
               >
                 <path
                   strokeLinecap="round"
@@ -306,58 +343,55 @@ export default function InteractiveGallery() {
               </svg>
             </button>
           )}
-
           <div
             ref={navScrollRef}
             onScroll={checkNavScroll}
-            className="flex overflow-x-auto gap-3 items-center w-full px-2 sm:px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
+            className="flex overflow-x-auto gap-3 items-center w-full px-2 sm:px-8 [&::-webkit-scrollbar]:hidden scroll-smooth"
           >
             <button
               onClick={() => setActiveFilters([])}
               className={`flex-shrink-0 px-6 py-3 rounded-full font-bold transition-all ${
                 activeFilters.length === 0
-                  ? "bg-gray-800 text-white dark:bg-white dark:text-black shadow-md scale-105"
-                  : "bg-white text-gray-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700"
+                  ? "bg-gray-800 text-white dark:bg-white dark:text-black shadow-md"
+                  : "bg-white text-gray-600 dark:bg-zinc-800 dark:text-zinc-400 hover:bg-gray-100"
               }`}
             >
               All
             </button>
-
-            {TAG_CATEGORIES.map((item) => {
-              const isActive = activeFilters.includes(item.tag);
-              return (
-                <button
-                  key={item.tag}
-                  onClick={() => toggleFilter(item.tag)}
-                  className={`flex-shrink-0 flex items-center gap-2 pr-5 pl-2 py-2 rounded-full font-medium transition-all ${
-                    isActive
-                      ? "bg-blue-600 text-white shadow-md scale-105"
-                      : "bg-white text-gray-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-blue-50 dark:hover:bg-zinc-700 border border-transparent dark:border-zinc-700"
-                  }`}
-                >
-                  <img
-                    src={item.img}
-                    alt={item.tag}
-                    className="w-8 h-8 rounded-full object-cover border border-white/20"
-                  />
-                  <span>{item.tag}</span>
-                </button>
-              );
-            })}
+            {tagCategories.map((item) => (
+              <button
+                key={item.tag}
+                onClick={() => toggleFilter(item.tag)}
+                className={`flex-shrink-0 flex items-center gap-2 pr-5 pl-2 py-2 rounded-full font-medium transition-all ${
+                  activeFilters.includes(item.tag)
+                    ? "bg-blue-600 text-white shadow-md scale-105"
+                    : "bg-white text-gray-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-blue-50"
+                }`}
+              >
+                <img
+                  src={item.img}
+                  alt={item.tag}
+                  className="w-8 h-8 rounded-full object-cover border border-white/20"
+                />
+                <span>#{item.tag}</span>
+              </button>
+            ))}
+            {isTagsLoading && (
+              <div className="flex-shrink-0 w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            )}
           </div>
-
           {canScrollRight && (
             <button
               onClick={() => scrollNav("right")}
-              className="absolute right-0 z-10 w-10 h-10 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity duration-300 hover:scale-105"
+              className="absolute right-0 z-10 w-10 h-10 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/nav:opacity-100 transition-opacity"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
-                strokeWidth={2}
+                strokeWidth={2.5}
                 stroke="currentColor"
-                className="w-5 h-5 text-gray-700 dark:text-gray-300"
+                className="w-5 h-5"
               >
                 <path
                   strokeLinecap="round"
@@ -369,145 +403,159 @@ export default function InteractiveGallery() {
           )}
         </div>
 
-        {/* --- 2. Selected Tags Area --- */}
         {activeFilters.length > 0 && (
-          <div className="relative flex items-center group/selectedNav px-4 sm:px-0 mt-1 pb-2">
-            {canScrollSelectedLeft && (
-              <button
-                onClick={() => scrollNav("left", true)}
-                className="absolute left-0 z-10 w-8 h-8 ml-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/selectedNav:opacity-100 transition-opacity duration-300 hover:scale-105"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                  className="w-4 h-4 text-gray-700 dark:text-gray-300"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M15.75 19.5L8.25 12l7.5-7.5"
-                  />
-                </svg>
-              </button>
-            )}
-
-            <div
-              ref={selectedNavScrollRef}
-              onScroll={checkSelectedNavScroll}
-              className="flex overflow-x-auto items-center gap-2 w-full px-2 sm:px-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] scroll-smooth"
-            >
-              <span className="flex-shrink-0 text-sm font-medium text-gray-500 dark:text-zinc-400 mr-1">
+          <div className="relative flex items-center px-4 sm:px-10 mt-1 pb-2 w-full">
+            <div className="flex-shrink-0 flex items-center mr-3">
+              <span className="text-sm font-medium text-gray-500">
                 Selected:
               </span>
+            </div>
+            <div
+              ref={selectedTagsContainerRef}
+              className="flex items-center gap-2 overflow-hidden whitespace-nowrap w-full"
+            >
               {activeFilters.map((tag) => (
                 <span
                   key={tag}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded-lg text-sm font-semibold shadow-sm border border-blue-200 dark:border-blue-800"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded-lg text-sm font-semibold border border-blue-200 dark:border-blue-800"
                 >
-                  {tag}
+                  #{tag}{" "}
                   <button
                     onClick={() => toggleFilter(tag)}
-                    className="hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors text-blue-600 dark:text-blue-300 hover:text-red-500 dark:hover:text-red-400"
-                    title="Remove"
+                    className="text-blue-600 hover:text-red-500 transition-colors"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
+                    ✕
                   </button>
                 </span>
               ))}
-
               {activeFilters.length > 1 && (
                 <button
                   onClick={() => setActiveFilters([])}
-                  className="flex-shrink-0 text-sm text-gray-500 hover:text-red-500 dark:text-zinc-400 dark:hover:text-red-400 underline ml-2 transition-colors font-medium"
+                  className="ml-2 text-sm font-bold text-red-500 hover:text-red-600 hover:underline bg-red-50 hover:bg-red-100 dark:bg-red-500/10 px-2 py-0.5 rounded"
                 >
                   Clear all
                 </button>
               )}
             </div>
-
-            {canScrollSelectedRight && (
-              <button
-                onClick={() => scrollNav("right", true)}
-                className="absolute right-0 z-10 w-8 h-8 mr-2 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center opacity-0 group-hover/selectedNav:opacity-100 transition-opacity duration-300 hover:scale-105"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                  stroke="currentColor"
-                  className="w-4 h-4 text-gray-700 dark:text-gray-300"
+            {isSelectedOverflowing && (
+              <div className="absolute right-4 sm:right-10 top-0 bottom-2 flex items-center pl-8 bg-gradient-to-l from-gray-50 dark:from-zinc-950 via-gray-50/90 to-transparent">
+                <button
+                  onClick={() => setShowAllSelectedModal(true)}
+                  className="px-3 py-1 bg-white dark:bg-zinc-800 shadow-sm border border-gray-200 dark:border-zinc-700 rounded-lg text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8.25 4.5l7.5 7.5-7.5 7.5"
-                  />
-                </svg>
-              </button>
+                  ...
+                </button>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* --- Gallery Grid --- */}
-      {images.length === 0 && !loading ? (
-        <div className="h-64 flex items-center justify-center text-gray-500">
-          No images found.
-        </div>
-      ) : (
-        <Masonry
-          breakpointCols={{ default: 4, 1100: 3, 700: 2, 500: 1 }}
-          className="flex w-auto -ml-4"
-          columnClassName="pl-4"
-        >
-          {images.map((img) => (
-            <ImageCard
-              key={img.id}
-              image={img}
-              onOpenModal={(selected) => setSelectedImage(selected)}
-            />
-          ))}
-        </Masonry>
-      )}
+      <Masonry
+        breakpointCols={{
+          default: 8,
+          1600: 6,
+          1300: 5,
+          1100: 4,
+          700: 2,
+          500: 1,
+        }}
+        className="flex w-auto -ml-4"
+        columnClassName="pl-4"
+      >
+        {images.map((img, index) => (
+          <ImageCard
+            key={`${img.id}-${index}`} // 💡 ใช้ ID ผสมกับ Index เพื่อความชัวร์ว่าไม่ซ้ำแน่ๆ
+            image={img}
+            onOpenModal={setSelectedImage}
+          />
+        ))}
+      </Masonry>
 
-      {/* --- Sentinel: จุดตรวจจับ --- */}
       <div
         ref={ref}
         className="h-20 w-full flex items-center justify-center mt-10"
       >
         {loading && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         )}
       </div>
+
+      {!isImagesLastPage && !hasScrolled && images.length > 0 && (
+        <div className="text-center py-4 text-gray-400 text-sm italic">
+          Scroll down to see more content...
+        </div>
+      )}
+
+      {isImagesLastPage && images.length > 0 && (
+        <div className="text-center py-10 text-gray-500 font-medium">
+          — End of Gallery —
+        </div>
+      )}
 
       <TagModal
         image={selectedImage}
         onClose={() => setSelectedImage(null)}
-        onSelectTag={(tag) => {
-          if (!activeFilters.includes(tag)) {
-            toggleFilter(tag);
-          }
-        }}
+        onSelectTag={toggleFilter}
+        activeFilters={activeFilters}
       />
+
+      {showAllSelectedModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setShowAllSelectedModal(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-2xl w-full max-w-lg p-6 shadow-2xl flex flex-col max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-800 dark:text-zinc-100">
+                Selected Tags ({activeFilters.length})
+              </h3>
+              <button
+                onClick={() => setShowAllSelectedModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 overflow-y-auto pr-2 mb-6 flex-1 content-start">
+              {activeFilters.map((tag) => (
+                <span
+                  key={tag}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded-lg text-sm font-semibold border border-blue-200 dark:border-blue-800"
+                >
+                  #{tag}{" "}
+                  <button
+                    onClick={() => toggleFilter(tag)}
+                    className="text-blue-600 hover:text-red-500"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+            <div className="flex justify-between items-center pt-4 border-t border-gray-100 dark:border-zinc-800">
+              <button
+                onClick={() => {
+                  setActiveFilters([]);
+                  setShowAllSelectedModal(false);
+                }}
+                className="text-red-500 font-medium hover:underline"
+              >
+                Clear all
+              </button>
+              <button
+                onClick={() => setShowAllSelectedModal(false)}
+                className="px-6 py-2 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200 rounded-xl font-bold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
